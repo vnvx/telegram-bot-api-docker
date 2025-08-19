@@ -253,6 +253,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("poststory", &Client::process_post_story_query);
+  methods_.emplace("repoststory", &Client::process_repost_story_query);
   methods_.emplace("editstory", &Client::process_edit_story_query);
   methods_.emplace("deletestory", &Client::process_delete_story_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
@@ -12838,6 +12839,31 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
                          make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(), active_period,
                          nullptr, is_posted_to_chat_page, protect_content),
                      td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_repost_story_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(from_chat_id, get_required_string_arg(query.get(), "from_chat_id"));
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, from_chat_id = std::move(from_chat_id)](const BusinessConnection *business_connection,
+                                                     PromisedQueryPtr query) {
+        auto chat_id = business_connection->user_chat_id_;
+        check_chat(from_chat_id, AccessRights::Read, std::move(query),
+                   [this, chat_id](int64 from_chat_id, PromisedQueryPtr query) {
+                     auto from_story_id = get_integer_arg(query.get(), "story_id", 0, 0, 1000000000);
+                     auto active_period = get_integer_arg(query.get(), "active_period", 0, 0, 1000000000);
+                     auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
+                     auto protect_content = to_bool(query->arg("protect_content"));
+                     send_request(make_object<td_api::postStory>(
+                                      chat_id, nullptr, nullptr, nullptr,
+                                      make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
+                                      active_period, make_object<td_api::storyFullId>(from_chat_id, from_story_id),
+                                      is_posted_to_chat_page, protect_content),
+                                  td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+                   });
       });
   return td::Status::OK();
 }
