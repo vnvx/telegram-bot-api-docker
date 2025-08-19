@@ -1285,9 +1285,9 @@ class Client::JsonGift final : public td::Jsonable {
     if (gift_->upgrade_star_count_ > 0) {
       object("upgrade_star_count", gift_->upgrade_star_count_);
     }
-    if (gift_->total_count_ > 0) {
-      object("remaining_count", gift_->remaining_count_);
-      object("total_count", gift_->total_count_);
+    if (gift_->overall_limits_ != nullptr && gift_->overall_limits_->total_count_ > 0) {
+      object("remaining_count", gift_->overall_limits_->remaining_count_);
+      object("total_count", gift_->overall_limits_->total_count_);
     }
     if (gift_->publisher_chat_id_ != 0) {
       object("publisher_chat", JsonChat(gift_->publisher_chat_id_, client_));
@@ -2722,7 +2722,23 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
       case td_api::upgradedGiftOriginResale::ID: {
         auto origin = static_cast<const td_api::upgradedGiftOriginResale *>(gift_->origin_.get());
         object("origin", "resale");
-        object("last_resale_star_count", origin->star_count_);
+        switch (origin->price_->get_id()) {
+          case td_api::giftResalePriceStar::ID: {
+            auto price = static_cast<const td_api::giftResalePriceStar *>(origin->price_.get());
+            object("last_resale_star_count", price->star_count_);
+            object("last_resale_currency", "XTR");
+            object("last_resale_amount", price->star_count_);
+            break;
+          }
+          case td_api::giftResalePriceTon::ID: {
+            auto price = static_cast<const td_api::giftResalePriceTon *>(origin->price_.get());
+            object("last_resale_currency", "TON");
+            object("last_resale_amount", price->toncoin_cent_count_ * 10000000);
+            break;
+          }
+          default:
+            UNREACHABLE();
+        }
         break;
       }
       default:
@@ -7051,7 +7067,6 @@ class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::availableGifts::ID);
     auto available_gifts = move_object_as<td_api::availableGifts>(result);
     auto gifts = td::transform(std::move(available_gifts->gifts_), [](auto &&gift) { return std::move(gift->gift_); });
-    td::remove_if(gifts, [](const auto &gift) { return gift->total_count_ > 0 && gift->remaining_count_ == 0; });
     answer_query(JsonGifts(gifts, client_), std::move(query_));
   }
 
@@ -12818,11 +12833,11 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
         auto active_period = get_integer_arg(query.get(), "active_period", 0, 0, 1000000000);
         auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
         auto protect_content = to_bool(query->arg("protect_content"));
-        send_request(
-            make_object<td_api::postStory>(business_connection->user_chat_id_, std::move(content), std::move(areas),
-                                           std::move(caption), make_object<td_api::storyPrivacySettingsEveryone>(),
-                                           active_period, nullptr, is_posted_to_chat_page, protect_content),
-            td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+        send_request(make_object<td_api::postStory>(
+                         business_connection->user_chat_id_, std::move(content), std::move(areas), std::move(caption),
+                         make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(), active_period,
+                         nullptr, is_posted_to_chat_page, protect_content),
+                     td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
       });
   return td::Status::OK();
 }
@@ -13414,7 +13429,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
                               auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
                               send_request(make_object<td_api::getReceivedGifts>(
                                                business_connection->id_, make_object<td_api::messageSenderUser>(my_id_),
-                                               exclude_unsaved, exclude_saved, exclude_unlimited, exclude_limited,
+                                               0, exclude_unsaved, exclude_saved, exclude_unlimited, exclude_limited,
                                                exclude_upgraded, sort_by_price, offset.str(), limit),
                                            td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
                             });
