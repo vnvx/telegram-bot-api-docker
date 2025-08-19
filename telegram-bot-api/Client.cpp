@@ -5687,7 +5687,8 @@ class Client::TdOnDeleteFailedToSendMessageCallback final : public TdQueryCallba
   void on_result(object_ptr<td_api::Object> result) final {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      if (error->code_ != 401 && !client_->need_close_ && !client_->closing_ && !client_->logging_out_) {
+      if (error->code_ != 401 && !client_->need_close_ && !client_->closing_ && !client_->logging_out_ &&
+          client_->have_message_access(chat_id_)) {
         LOG(ERROR) << "Can't delete failed to send message " << message_id_ << " because of "
                    << td::oneline(to_string(error)) << " in " << client_->get_chat_description(chat_id_)
                    << ". Old chat description: " << old_chat_description_;
