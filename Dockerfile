@@ -49,7 +49,7 @@ RUN groupadd --gid 1000 tbot && \
 # install only runtime packages (not -dev packages)
 RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache \
     --mount=type=cache,target=/var/cache/apt/archives,id=apt-archives \
-    apt-get update && apt-get install -y ca-certificates zlib1g
+    apt-get update && apt-get install -y ca-certificates zlib1g procps
 # --- Shrink the runtime image ---
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -70,8 +70,9 @@ EXPOSE ${LISTEN_PORT}
 STOPSIGNAL SIGTERM
 
 # small healthcheck — adjust path/port/endpoint as appropriate for your app
+# "telegram-bot-ap" is correct (pattern that searches for process name longer than 15 characters will result in zero matches)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD pgrep -x telegram-bot-api >/dev/null || exit 1
+  CMD pgrep -x telegram-bot-ap >/dev/null || exit 1
 
 ENTRYPOINT ["telegram-bot-api"]
 CMD ["--help"]
