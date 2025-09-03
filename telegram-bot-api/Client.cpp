@@ -16104,7 +16104,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     }
 
-    if (supergroup_info->date > message->date_ || authorization_date_ > message->date_) {
+    if (supergroup_info->date > message_date || authorization_date_ > message_date) {
       // don't send messages received before join or getting authorization
       return true;
     }
