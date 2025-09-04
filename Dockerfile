@@ -47,11 +47,7 @@ RUN groupadd --gid 1000 tbot && \
     useradd --uid 1000 --gid tbot --create-home --home-dir /home/tbot --shell /bin/bash tbot
 
 # install only runtime packages (not -dev packages)
-RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache \
-    --mount=type=cache,target=/var/cache/apt/archives,id=apt-archives \
-    apt-get update && apt-get install -y ca-certificates zlib1g procps
-# --- Shrink the runtime image ---
-RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update && apt-get install -y ca-certificates zlib1g procps && rm -rf /var/lib/apt/lists/*
 
 # copy the built binary from builder
 COPY --from=builder /usr/local/bin/telegram-bot-api /usr/local/bin/telegram-bot-api
