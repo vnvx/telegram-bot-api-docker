@@ -2742,6 +2742,9 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         }
         break;
       }
+      case td_api::upgradedGiftOriginPrepaidUpgrade::ID:
+        object("origin", "gifted_upgrade");
+        break;
       default:
         UNREACHABLE();
     }
@@ -13457,7 +13460,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
                               send_request(make_object<td_api::getReceivedGifts>(
                                                business_connection->id_, make_object<td_api::messageSenderUser>(my_id_),
                                                0, exclude_unsaved, exclude_saved, exclude_unlimited, exclude_limited,
-                                               exclude_upgraded, sort_by_price, offset.str(), limit),
+                                               exclude_limited, exclude_upgraded, sort_by_price, offset.str(), limit),
                                            td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
                             });
   return td::Status::OK();
