@@ -1401,6 +1401,9 @@ class Client::JsonUniqueGift final : public td::Jsonable {
     if (gift_->publisher_chat_id_ != 0) {
       object("publisher_chat", JsonChat(gift_->publisher_chat_id_, client_));
     }
+    if (gift_->is_premium_) {
+      object("is_premium", td::JsonTrue());
+    }
   }
 
  private:
