@@ -2707,6 +2707,9 @@ class Client::JsonGiftMessage final : public td::Jsonable {
     if (gift_->is_private_) {
       object("is_private", td::JsonTrue());
     }
+    if (gift_->is_upgrade_separate_) {
+      object("is_upgrade_separate", td::JsonTrue());
+    }
   }
 
  private:
