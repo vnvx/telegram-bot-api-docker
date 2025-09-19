@@ -13490,22 +13490,29 @@ td::Status Client::process_transfer_business_account_stars_query(PromisedQueryPt
 
 td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
-  check_business_connection(business_connection_id, std::move(query),
-                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
-                              auto exclude_unsaved = to_bool(query->arg("exclude_unsaved"));
-                              auto exclude_saved = to_bool(query->arg("exclude_saved"));
-                              auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
-                              auto exclude_limited = to_bool(query->arg("exclude_limited"));
-                              auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
-                              auto sort_by_price = to_bool(query->arg("sort_by_price"));
-                              auto offset = query->arg("offset");
-                              auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
-                              send_request(make_object<td_api::getReceivedGifts>(
-                                               business_connection->id_, make_object<td_api::messageSenderUser>(my_id_),
-                                               0, exclude_unsaved, exclude_saved, exclude_unlimited, exclude_limited,
-                                               exclude_limited, exclude_upgraded, sort_by_price, offset.str(), limit),
-                                           td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
-                            });
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
+        auto exclude_unsaved = to_bool(query->arg("exclude_unsaved"));
+        auto exclude_saved = to_bool(query->arg("exclude_saved"));
+        auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
+        auto exclude_limited = to_bool(query->arg("exclude_limited"));
+        auto exclude_limited_upgradable = to_bool(query->arg("exclude_limited_upgradable"));
+        auto exclude_limited_non_upgradable = to_bool(query->arg("exclude_limited_non_upgradable"));
+        auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
+        auto sort_by_price = to_bool(query->arg("sort_by_price"));
+        auto offset = query->arg("offset");
+        auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+        if (exclude_limited) {
+          exclude_limited_upgradable = true;
+          exclude_limited_non_upgradable = true;
+        }
+        send_request(make_object<td_api::getReceivedGifts>(
+                         business_connection->id_, make_object<td_api::messageSenderUser>(my_id_), 0, exclude_unsaved,
+                         exclude_saved, exclude_unlimited, exclude_limited_upgradable, exclude_limited_non_upgradable,
+                         exclude_upgraded, sort_by_price, offset.str(), limit),
+                     td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
+      });
   return td::Status::OK();
 }
 
