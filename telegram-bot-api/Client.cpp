@@ -4098,7 +4098,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageGift::ID: {
       auto content = static_cast<const td_api::messageGift *>(message_->content.get());
-      object("gift", JsonGiftMessage(content, client_));
+      if (content->is_prepaid_upgrade_) {
+        object("gift_upgrade_sent", JsonGiftMessage(content, client_));
+      } else {
+        object("gift", JsonGiftMessage(content, client_));
+      }
       break;
     }
     case td_api::messageUpgradedGift::ID: {
