@@ -1290,6 +1290,10 @@ class Client::JsonGift final : public td::Jsonable {
       object("remaining_count", gift_->overall_limits_->remaining_count_);
       object("total_count", gift_->overall_limits_->total_count_);
     }
+    if (gift_->user_limits_ != nullptr && gift_->user_limits_->total_count_ > 0) {
+      object("personal_remaining_count", gift_->user_limits_->remaining_count_);
+      object("personal_total_count", gift_->user_limits_->total_count_);
+    }
     if (gift_->publisher_chat_id_ != 0) {
       object("publisher_chat", JsonChat(gift_->publisher_chat_id_, client_));
     }
