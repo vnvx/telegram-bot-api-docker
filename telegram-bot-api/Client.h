@@ -104,6 +104,7 @@ class Client final : public WebhookActor::Callback {
   class JsonChatLocation;
   class JsonChatInviteLink;
   class JsonChat;
+  class JsonUserRating;
   class JsonMessageSender;
   class JsonMessageOrigin;
   class JsonExternalReplyInfo;
@@ -961,6 +962,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::birthdate> birthdate;
     object_ptr<td_api::businessInfo> business_info;
     object_ptr<td_api::acceptedGiftTypes> accepted_gift_types;
+    object_ptr<td_api::userRating> rating;
     int64 personal_chat_id = 0;
 
     bool have_access = false;

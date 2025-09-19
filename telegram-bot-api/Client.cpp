@@ -963,6 +963,24 @@ class Client::JsonChatInviteLink final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonUserRating final : public td::Jsonable {
+ public:
+  explicit JsonUserRating(const td_api::userRating *user_rating) : user_rating_(user_rating) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("level", user_rating_->level_);
+    object("rating", user_rating_->rating_);
+    object("current_level_rating", user_rating_->current_level_rating_);
+    if (!user_rating_->is_maximum_level_reached_) {
+      object("next_level_rating", user_rating_->next_level_rating_);
+    }
+  }
+
+ private:
+  const td_api::userRating *user_rating_;
+};
+
 class Client::JsonMessage final : public td::Jsonable {
  public:
   JsonMessage(const MessageInfo *message, bool need_reply, const td::string &source, const Client *client)
@@ -1061,6 +1079,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->personal_chat_id != 0) {
             object("personal_chat", JsonChat(user_info->personal_chat_id, client_));
+          }
+          if (user_info->rating != nullptr) {
+            object("rating", JsonUserRating(user_info->rating.get()));
           }
         }
         photo = user_info->photo.get();
@@ -8416,6 +8437,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->birthdate = std::move(full_info->birthdate_);
       user_info->business_info = std::move(full_info->business_info_);
       user_info->accepted_gift_types = std::move(full_info->gift_settings_->accepted_gift_types_);
+      user_info->rating = std::move(full_info->rating_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
