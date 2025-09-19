@@ -5106,6 +5106,9 @@ class Client::JsonReceivedGift final : public td::Jsonable {
     if (received_gift_->next_transfer_date_ > 0) {
       object("next_transfer_date", received_gift_->next_transfer_date_);
     }
+    if (received_gift_->is_upgrade_separate_) {
+      object("is_upgrade_separate", td::JsonTrue());
+    }
   }
 
  private:
