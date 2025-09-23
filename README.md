@@ -10,6 +10,8 @@ Please note that only global Bot API issues that affect all bots are suitable fo
 - [Installation](#installation)
 - [Dependencies](#dependencies)
 - [Usage](#usage)
+- [Docker Usage](#docker-usage)
+- [Docker Compose Usage](#docker-compose-usage)
 - [Documentation](#documentation)
 - [Moving a bot to a local server](#switching)
 - [Moving a bot from one local server to another](#moving)
@@ -64,6 +66,41 @@ To enable Bot API features not available at `https://api.telegram.org`, specify 
 The Telegram Bot API server accepts only HTTP requests, so a TLS termination proxy needs to be used to handle remote HTTPS requests.
 
 By default the Telegram Bot API server is launched on the port 8081, which can be changed using the option `--http-port`.
+
+<a name="docker-usage"></a>
+## Docker Usage
+
+You can also use Docker to run the Telegram Bot API server.
+
+First, build the Docker image:
+
+```sh
+docker build -t telegram-bot-api .
+```
+
+Then, run the container:
+
+```sh
+docker run -d -p 8081:8081 --name=telegram-bot-api --restart=always -e TELEGRAM_API_ID=<your api id> -e TELEGRAM_API_HASH=<your api hash> telegram-bot-api --local
+```
+
+<a name="docker-compose-usage"></a>
+## Docker Compose Usage
+
+You can also use Docker Compose to run the Telegram Bot API server.
+
+First, create a `.env` file with the following content:
+
+```
+TELEGRAM_API_ID=<your api id>
+TELEGRAM_API_HASH=<your api hash>
+```
+
+Then, run the container:
+
+```sh
+docker-compose up -d
+```
 
 <a name="documentation"></a>
 ## Documentation
