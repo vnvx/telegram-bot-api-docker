@@ -2562,7 +2562,7 @@ class Client::JsonForumTopicInfo final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("message_thread_id", as_client_message_id(forum_topic_info_->message_thread_id_));
+    object("message_thread_id", forum_topic_info_->forum_topic_id_);
     object("name", forum_topic_info_->name_);
     object("icon_color", forum_topic_info_->icon_->color_);
     if (forum_topic_info_->icon_->custom_emoji_id_ != 0) {
@@ -2779,6 +2779,9 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
       }
       case td_api::upgradedGiftOriginPrepaidUpgrade::ID:
         object("origin", "gifted_upgrade");
+        break;
+      case td_api::upgradedGiftOriginBlockchain::ID:
+        object("origin", "blockchain");
         break;
       default:
         UNREACHABLE();
@@ -3636,8 +3639,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->edit_date > 0) {
     object("edit_date", message_->edit_date);
   }
-  if (message_->message_thread_id != 0) {
-    object("message_thread_id", as_client_message_id(message_->message_thread_id));
+  auto message_thread_id = get_message_thread_id(message_->topic_id);
+  if (message_thread_id != 0) {
+    object("message_thread_id", as_client_message_id(message_thread_id));
   }
   if (message_->initial_send_date > 0) {
     CHECK(message_->forward_origin != nullptr);
@@ -4174,6 +4178,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("suggested_post_refunded", JsonSuggestedPostRefunded(content, message_->chat_id, client_));
       break;
     }
+    case td_api::messageSuggestBirthdate::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -6215,7 +6221,7 @@ class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
 
     const MessageInfo *message_info = client_->get_message(chat_id_, message_thread_id_, true);
     CHECK(message_info != nullptr);
-    if (message_info->message_thread_id != message_thread_id_) {
+    if (get_message_thread_id(message_info->topic_id) != message_thread_id_) {
       return fail_query_with_error(std::move(query_), 400, "MESSAGE_THREAD_INVALID", "Message thread not found");
     }
     if (!is_topic_message(message_info->topic_id)) {
@@ -7907,7 +7913,7 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
               if (reply_to_message_id > 0 && reply_parameters.reply_in_chat_id == chat_id) {
                 const MessageInfo *message_info = get_message(reply_in_chat_id, reply_to_message_id, true);
                 CHECK(message_info != nullptr);
-                if (message_info->message_thread_id == message_thread_id) {
+                if (get_message_thread_id(message_info->topic_id) == message_thread_id) {
                   reply_parameters.reply_in_chat_id = 0;
                 }
               }
@@ -9556,10 +9562,10 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(
     bool disable_notification, bool protect_content, bool allow_paid_broadcast, int64 effect_id,
-    int64 direct_messages_topic_id, object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info) {
-  return make_object<td_api::messageSendOptions>(direct_messages_topic_id, std::move(input_suggested_post_info),
-                                                 disable_notification, false, protect_content, allow_paid_broadcast, 0,
-                                                 false, nullptr, effect_id, 0, false);
+    object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info) {
+  return make_object<td_api::messageSendOptions>(std::move(input_suggested_post_info), disable_notification, false,
+                                                 protect_content, allow_paid_broadcast, 0, false, nullptr, effect_id, 0,
+                                                 false);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
@@ -11603,6 +11609,20 @@ td::Result<td::MutableSlice> Client::get_required_string_arg(const Query *query,
   return s_arg;
 }
 
+td::int32 Client::get_forum_topic_id(const Query *query, td::Slice field_name) {
+  auto s_arg = query->arg(field_name);
+  if (s_arg.empty()) {
+    return 0;
+  }
+
+  int arg = td::to_integer<int32>(s_arg);
+  if (arg < 0) {
+    return 0;
+  }
+
+  return arg;
+}
+
 td::int64 Client::get_message_id(const Query *query, td::Slice field_name) {
   auto s_arg = query->arg(field_name);
   if (s_arg.empty()) {
@@ -12339,12 +12359,12 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
   }
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
-  auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  // auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
   auto remove_caption = to_bool(query->arg("remove_caption"));
 
-  auto send_options = get_message_send_options(disable_notification, protect_content, false, 0,
-                                               direct_messages_topic_id, std::move(input_suggested_post_info));
+  auto send_options =
+      get_message_send_options(disable_notification, protect_content, false, 0, std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options),
                      remove_caption](int64 chat_id, int64 message_thread_id, CheckedReplyParameters,
@@ -12366,10 +12386,10 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
           auto message_count = message_ids.size();
           count += static_cast<int32>(message_count);
 
-          send_request(
-              make_object<td_api::forwardMessages>(chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                                                   std::move(send_options), true, remove_caption),
-              td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
+          send_request(make_object<td_api::forwardMessages>(
+                           chat_id, make_object<td_api::messageTopicThread>(message_thread_id), from_chat_id,
+                           std::move(message_ids), std::move(send_options), true, remove_caption),
+                       td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
   check_reply_parameters(chat_id, InputReplyParameters(), message_thread_id, std::move(query), std::move(on_success));
@@ -12404,11 +12424,11 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
   }
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
-  auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  // auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
 
-  auto send_options = get_message_send_options(disable_notification, protect_content, false, 0,
-                                               direct_messages_topic_id, std::move(input_suggested_post_info));
+  auto send_options =
+      get_message_send_options(disable_notification, protect_content, false, 0, std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options)](int64 chat_id, int64 message_thread_id,
                                                              CheckedReplyParameters, PromisedQueryPtr query) mutable {
@@ -12429,10 +12449,10 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
           auto message_count = message_ids.size();
           count += static_cast<int32>(message_count);
 
-          send_request(
-              make_object<td_api::forwardMessages>(chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                                                   std::move(send_options), false, false),
-              td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
+          send_request(make_object<td_api::forwardMessages>(
+                           chat_id, make_object<td_api::messageTopicThread>(message_thread_id), from_chat_id,
+                           std::move(message_ids), std::move(send_options), false, false),
+                       td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
   check_reply_parameters(chat_id, InputReplyParameters(), message_thread_id, std::move(query), std::move(on_success));
@@ -12449,14 +12469,14 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto protect_content = to_bool(query->arg("protect_content"));
   auto allow_paid_broadcast = to_bool(query->arg("allow_paid_broadcast"));
   auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
-  auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  // auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
   // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   auto reply_markup = nullptr;
   TRY_RESULT(input_message_contents, get_input_message_contents(query.get(), "media"));
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                                               direct_messages_topic_id, std::move(input_suggested_post_info));
+                                               std::move(input_suggested_post_info));
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
@@ -12490,10 +12510,11 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
           auto message_count = input_message_contents.size();
           count += static_cast<int32>(message_count);
 
-          send_request(make_object<td_api::sendMessageAlbum>(
-                           chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
-                           std::move(send_options), std::move(input_message_contents)),
-                       td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
+          send_request(
+              make_object<td_api::sendMessageAlbum>(chat_id, make_object<td_api::messageTopicThread>(message_thread_id),
+                                                    get_input_message_reply_to(std::move(reply_parameters)),
+                                                    std::move(send_options), std::move(input_message_contents)),
+              td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
                                std::move(on_success), allow_paid_broadcast);
@@ -12503,7 +12524,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
   auto chat_id_str = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
   auto business_connection_id = query->arg("business_connection_id").str();
   object_ptr<td_api::ChatAction> action = get_chat_action(query.get());
   if (action == nullptr) {
@@ -12514,16 +12535,18 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
         business_connection_id, chat_id_str.str(), std::move(query),
         [this, action = std::move(action)](const BusinessConnection *business_connection, int64 chat_id,
                                            PromisedQueryPtr query) mutable {
-          send_request(make_object<td_api::sendChatAction>(chat_id, 0, business_connection->id_, std::move(action)),
-                       td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+          send_request(
+              make_object<td_api::sendChatAction>(chat_id, nullptr, business_connection->id_, std::move(action)),
+              td::make_unique<TdOnOkQueryCallback>(std::move(query)));
         });
     return td::Status::OK();
   }
 
   check_chat(chat_id_str, AccessRights::Write, std::move(query),
-             [this, message_thread_id, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
+             [this, forum_topic_id, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
                send_request(
-                   make_object<td_api::sendChatAction>(chat_id, message_thread_id, td::string(), std::move(action)),
+                   make_object<td_api::sendChatAction>(chat_id, make_object<td_api::messageTopicForum>(forum_topic_id),
+                                                       td::string(), std::move(action)),
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13510,7 +13533,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
         send_request(make_object<td_api::getReceivedGifts>(
                          business_connection->id_, make_object<td_api::messageSenderUser>(my_id_), 0, exclude_unsaved,
                          exclude_saved, exclude_unlimited, exclude_limited_upgradable, exclude_limited_non_upgradable,
-                         exclude_upgraded, sort_by_price, offset.str(), limit),
+                         exclude_upgraded, false, false, sort_by_price, offset.str(), limit),
                      td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
       });
   return td::Status::OK();
@@ -13815,24 +13838,25 @@ td::Status Client::process_create_forum_topic_query(PromisedQueryPtr &query) {
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, name = name.str(), icon_color, icon_custom_emoji_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::createForumTopic>(
-                                chat_id, name, make_object<td_api::forumTopicIcon>(icon_color, icon_custom_emoji_id)),
-                            td::make_unique<TdOnGetForumTopicInfoCallback>(std::move(query)));
+               send_request(
+                   make_object<td_api::createForumTopic>(
+                       chat_id, name, false, make_object<td_api::forumTopicIcon>(icon_color, icon_custom_emoji_id)),
+                   td::make_unique<TdOnGetForumTopicInfoCallback>(std::move(query)));
              });
   return td::Status::OK();
 }
 
 td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
   auto name = query->arg("name");
   auto edit_icon_custom_emoji_id = query->has_arg("icon_custom_emoji_id");
   auto icon_custom_emoji_id = td::to_integer<int64>(query->arg("icon_custom_emoji_id"));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id, name = name.str(), edit_icon_custom_emoji_id, icon_custom_emoji_id](
+             [this, forum_topic_id, name = name.str(), edit_icon_custom_emoji_id, icon_custom_emoji_id](
                  int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::editForumTopic>(chat_id, message_thread_id, name,
+               send_request(make_object<td_api::editForumTopic>(chat_id, forum_topic_id, name,
                                                                 edit_icon_custom_emoji_id, icon_custom_emoji_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
@@ -13841,11 +13865,11 @@ td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_close_forum_topic_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, message_thread_id, true),
+             [this, forum_topic_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, forum_topic_id, true),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13853,11 +13877,11 @@ td::Status Client::process_close_forum_topic_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_reopen_forum_topic_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, message_thread_id, false),
+             [this, forum_topic_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, forum_topic_id, false),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13865,11 +13889,11 @@ td::Status Client::process_reopen_forum_topic_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_delete_forum_topic_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::deleteForumTopic>(chat_id, message_thread_id),
+             [this, forum_topic_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::deleteForumTopic>(chat_id, forum_topic_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13877,11 +13901,11 @@ td::Status Client::process_delete_forum_topic_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_unpin_all_forum_topic_messages_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::unpinAllMessageThreadMessages>(chat_id, message_thread_id),
+             [this, forum_topic_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::unpinAllForumTopicMessages>(chat_id, forum_topic_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13893,7 +13917,7 @@ td::Status Client::process_edit_general_forum_topic_query(PromisedQueryPtr &quer
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, name = name.str()](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::editForumTopic>(chat_id, GENERAL_MESSAGE_THREAD_ID, name, false, 0),
+               send_request(make_object<td_api::editForumTopic>(chat_id, GENERAL_FORUM_TOPIC_ID, name, false, 0),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -13903,7 +13927,7 @@ td::Status Client::process_close_general_forum_topic_query(PromisedQueryPtr &que
   auto chat_id = query->arg("chat_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
-    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, true),
+    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_FORUM_TOPIC_ID, true),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return td::Status::OK();
@@ -13913,7 +13937,7 @@ td::Status Client::process_reopen_general_forum_topic_query(PromisedQueryPtr &qu
   auto chat_id = query->arg("chat_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
-    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, false),
+    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_FORUM_TOPIC_ID, false),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return td::Status::OK();
@@ -13943,7 +13967,7 @@ td::Status Client::process_unpin_all_general_forum_topic_messages_query(Promised
   auto chat_id = query->arg("chat_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
-    send_request(make_object<td_api::unpinAllMessageThreadMessages>(chat_id, GENERAL_MESSAGE_THREAD_ID),
+    send_request(make_object<td_api::unpinAllForumTopicMessages>(chat_id, GENERAL_FORUM_TOPIC_ID),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return td::Status::OK();
@@ -14958,13 +14982,14 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto reply_markup = r_reply_markup.move_as_ok();
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                                               direct_messages_topic_id, r_input_suggested_post_info.move_as_ok());
+                                               r_input_suggested_post_info.move_as_ok());
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
-       reply_parameters = std::move(reply_parameters), disable_notification, protect_content, allow_paid_broadcast,
-       effect_id, send_options = std::move(send_options), input_message_content = std::move(input_message_content)](
-          object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+      [this, chat_id_str = chat_id.str(), message_thread_id, direct_messages_topic_id,
+       business_connection_id = business_connection_id.str(), reply_parameters = std::move(reply_parameters),
+       disable_notification, protect_content, allow_paid_broadcast, effect_id, send_options = std::move(send_options),
+       input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                                 PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
           return check_business_connection_chat_id(
               business_connection_id, chat_id_str, std::move(query),
@@ -14992,8 +15017,9 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
           count++;
 
           send_request(make_object<td_api::sendMessage>(
-                           chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
-                           std::move(send_options), std::move(reply_markup), std::move(input_message_content)),
+                           chat_id, make_object<td_api::messageTopicThread>(message_thread_id),
+                           get_input_message_reply_to(std::move(reply_parameters)), std::move(send_options),
+                           std::move(reply_markup), std::move(input_message_content)),
                        td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
@@ -16247,6 +16273,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGiftedTon::ID:
       return true;
+    case td_api::messageSuggestBirthdate::ID:
+      return true;
     default:
       break;
   }
@@ -16337,16 +16365,18 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
     CHECK(message->reply_to_ == nullptr);
     return content_message_id;
   }
-  return get_same_chat_reply_to_message_id(
-      message->reply_to_, message->message_thread_id_ < message->id_ ? message->message_thread_id_ : 0);
+  auto message_thread_id = get_message_thread_id(message->topic_id_);
+  return get_same_chat_reply_to_message_id(message->reply_to_,
+                                           message_thread_id < message->id_ ? message_thread_id : 0);
 }
 
 td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_info) {
   if (message_info == nullptr) {
     return 0;
   }
-  auto message_thread_id = message_info->message_thread_id < message_info->id ? message_info->message_thread_id : 0;
-  return get_same_chat_reply_to_message_id(message_info->reply_to_message.get(), message_thread_id);
+  auto message_thread_id = get_message_thread_id(message_info->topic_id);
+  return get_same_chat_reply_to_message_id(message_info->reply_to_message.get(),
+                                           message_thread_id < message_info->id ? message_thread_id : 0);
 }
 
 void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
@@ -16773,7 +16803,6 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   int64 chat_id = message->chat_id_;
   message_info->id = message->id_;
   message_info->chat_id = chat_id;
-  message_info->message_thread_id = message->message_thread_id_;
   message_info->date = message->date_;
   message_info->edit_date = message->edit_date_;
   message_info->media_album_id = message->media_album_id_;
@@ -17041,6 +17070,25 @@ td::int32 Client::get_unix_time() const {
   return parameters_->shared_data_->get_unix_time(td::Time::now());
 }
 
+td::int64 Client::get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
+  if (topic_id == nullptr) {
+    return 0;
+  }
+  switch (topic_id->get_id()) {
+    case td_api::messageTopicThread::ID:
+      return static_cast<const td_api::messageTopicThread *>(topic_id.get())->message_thread_id_;
+    case td_api::messageTopicForum::ID:
+      return as_tdlib_message_id(static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_);
+    case td_api::messageTopicDirectMessages::ID:
+      return 0;
+    case td_api::messageTopicSavedMessages::ID:
+      return 0;
+    default:
+      UNREACHABLE();
+      return 0;
+  }
+}
+
 td::int64 Client::as_tdlib_message_id(int32 message_id) {
   return static_cast<int64>(message_id) << 20;
 }
@@ -17085,7 +17133,7 @@ td::int64 Client::get_status_custom_emoji_id(const object_ptr<td_api::emojiStatu
 
 bool Client::is_topic_message(const object_ptr<td_api::MessageTopic> &topic_id) {
   return topic_id != nullptr && topic_id->get_id() == td_api::messageTopicForum::ID &&
-         static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_ != GENERAL_MESSAGE_THREAD_ID;
+         static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_ != GENERAL_FORUM_TOPIC_ID;
 }
 
 td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;

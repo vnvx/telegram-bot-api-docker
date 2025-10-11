@@ -65,7 +65,7 @@ class Client final : public WebhookActor::Callback {
 
   static constexpr bool USE_MESSAGE_DATABASE = false;
 
-  static constexpr int64 GENERAL_MESSAGE_THREAD_ID = 1 << 20;
+  static constexpr int32 GENERAL_FORUM_TOPIC_ID = 1;
 
   static constexpr int32 MAX_CERTIFICATE_FILE_SIZE = 3 << 20;
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
@@ -649,7 +649,7 @@ class Client final : public WebhookActor::Callback {
 
   static object_ptr<td_api::messageSendOptions> get_message_send_options(
       bool disable_notification, bool protect_content, bool allow_paid_broadcast, int64 effect_id,
-      int64 direct_messages_topic_id, object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info);
+      object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info);
 
   static td::Result<td::vector<object_ptr<td_api::formattedText>>> get_poll_options(const Query *query);
 
@@ -681,6 +681,8 @@ class Client final : public WebhookActor::Callback {
                                int32 max_value = std::numeric_limits<int32>::max());
 
   static td::Result<td::MutableSlice> get_required_string_arg(const Query *query, td::Slice field_name);
+
+  static int32 get_forum_topic_id(const Query *query, td::Slice field_name);
 
   static int64 get_message_id(const Query *query, td::Slice field_name = td::Slice("message_id"));
 
@@ -1065,7 +1067,6 @@ class Client final : public WebhookActor::Callback {
     int64 sender_user_id = 0;
     int64 sender_chat_id = 0;
     int64 chat_id = 0;
-    int64 message_thread_id = 0;
     int32 date = 0;
     int32 edit_date = 0;
     int32 initial_send_date = 0;
@@ -1209,6 +1210,8 @@ class Client final : public WebhookActor::Callback {
                                 object_ptr<td_api::ReplyMarkup> &&reply_markup);
 
   int32 get_unix_time() const;
+
+  static int64 get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id);
 
   static int64 as_tdlib_message_id(int32 message_id);
 
