@@ -1344,6 +1344,9 @@ class Client::JsonGift final : public td::Jsonable {
     if (gift_->is_premium_) {
       object("is_premium", td::JsonTrue());
     }
+    if (gift_->has_colors_) {
+      object("has_colors", td::JsonTrue());
+    }
   }
 
  private:
