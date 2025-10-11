@@ -981,6 +981,26 @@ class Client::JsonUserRating final : public td::Jsonable {
   const td_api::userRating *user_rating_;
 };
 
+class Client::JsonUniqueGiftColors final : public td::Jsonable {
+ public:
+  explicit JsonUniqueGiftColors(const td_api::upgradedGiftColors *gift_colors) : gift_colors_(gift_colors) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("model_custom_emoji_id", td::to_string(gift_colors_->model_custom_emoji_id_));
+    object("symbol_custom_emoji_id", td::to_string(gift_colors_->symbol_custom_emoji_id_));
+    object("light_theme_main_color", gift_colors_->light_theme_accent_color_);
+    object("light_theme_other_colors",
+           td::json_array(gift_colors_->light_theme_colors_, [](int32 color) { return color; }));
+    object("dark_theme_main_color", gift_colors_->dark_theme_accent_color_);
+    object("dark_theme_other_colors",
+           td::json_array(gift_colors_->dark_theme_colors_, [](int32 color) { return color; }));
+  }
+
+ private:
+  const td_api::upgradedGiftColors *gift_colors_;
+};
+
 class Client::JsonMessage final : public td::Jsonable {
  public:
   JsonMessage(const MessageInfo *message, bool need_reply, const td::string &source, const Client *client)
@@ -1275,6 +1295,9 @@ class Client::JsonChat final : public td::Jsonable {
       object("accent_color_id", chat_info->accent_color_id);
       if (chat_info->background_custom_emoji_id != 0) {
         object("background_custom_emoji_id", td::to_string(chat_info->background_custom_emoji_id));
+      }
+      if (chat_info->upgraded_gift_colors != nullptr) {
+        object("unique_gift_colors", JsonUniqueGiftColors(chat_info->upgraded_gift_colors.get()));
       }
       if (chat_info->profile_accent_color_id != -1) {
         object("profile_accent_color_id", chat_info->profile_accent_color_id);
@@ -8371,6 +8394,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       set_chat_available_reactions(chat_info, std::move(chat->available_reactions_));
       chat_info->accent_color_id = chat->accent_color_id_;
       chat_info->background_custom_emoji_id = chat->background_custom_emoji_id_;
+      chat_info->upgraded_gift_colors = std::move(chat->upgraded_gift_colors_);
       chat_info->profile_accent_color_id = chat->profile_accent_color_id_;
       chat_info->profile_background_custom_emoji_id = chat->profile_background_custom_emoji_id_;
       chat_info->has_protected_content = chat->has_protected_content_;
@@ -8426,6 +8450,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->accent_color_id = update->accent_color_id_;
       chat_info->background_custom_emoji_id = update->background_custom_emoji_id_;
+      chat_info->upgraded_gift_colors = std::move(update->upgraded_gift_colors_);
       chat_info->profile_accent_color_id = update->profile_accent_color_id_;
       chat_info->profile_background_custom_emoji_id = update->profile_background_custom_emoji_id_;
       break;

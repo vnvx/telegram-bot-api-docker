@@ -191,6 +191,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUniqueGiftBackdropColors;
   class JsonUniqueGiftBackdrop;
   class JsonUniqueGift;
+  class JsonUniqueGiftColors;
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
   class JsonBusinessBotRights;
@@ -1039,6 +1040,7 @@ class Client final : public WebhookActor::Callback {
     int32 profile_accent_color_id = -1;
     int64 background_custom_emoji_id = 0;
     int64 profile_background_custom_emoji_id = 0;
+    object_ptr<td_api::upgradedGiftColors> upgraded_gift_colors;
     bool has_protected_content = false;
     int32 max_reaction_count = 0;
     object_ptr<td_api::chatAvailableReactionsSome> available_reactions;
