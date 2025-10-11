@@ -1452,6 +1452,9 @@ class Client::JsonUniqueGift final : public td::Jsonable {
     if (gift_->is_premium_) {
       object("is_premium", td::JsonTrue());
     }
+    if (gift_->colors_ != nullptr) {
+      object("colors", JsonUniqueGiftColors(gift_->colors_.get()));
+    }
   }
 
  private:
