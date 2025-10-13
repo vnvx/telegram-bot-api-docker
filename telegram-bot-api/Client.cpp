@@ -1441,7 +1441,7 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("gift_id", gift_->regular_gift_id_);
+    object("gift_id", td::to_string(gift_->regular_gift_id_));
     object("base_name", gift_->title_);
     object("name", gift_->name_);
     object("number", gift_->number_);
