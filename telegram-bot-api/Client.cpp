@@ -6162,10 +6162,10 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
     }
 
     CHECK(result->get_id() == td_api::message::ID);
-    auto full_message_id = client_->add_message(move_object_as<td_api::message>(result));
-    CHECK(full_message_id.chat_id == chat_id_);
-    CHECK(full_message_id.message_id == message_id_);
-    on_success_(full_message_id.chat_id, full_message_id.message_id, std::move(query_));
+    auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
+    CHECK(message_full_id.chat_id == chat_id_);
+    CHECK(message_full_id.message_id == message_id_);
+    on_success_(message_full_id.chat_id, message_full_id.message_id, std::move(query_));
   }
 
  private:
@@ -6213,9 +6213,9 @@ class Client::TdOnCheckMessagesCallback final : public TdQueryCallback {
         }
         continue;
       }
-      auto full_message_id = client_->add_message(std::move(message));
-      CHECK(full_message_id.chat_id == chat_id_);
-      message_ids.push_back(full_message_id.message_id);
+      auto message_full_id = client_->add_message(std::move(message));
+      CHECK(message_full_id.chat_id == chat_id_);
+      message_ids.push_back(message_full_id.message_id);
     }
     on_success_(chat_id_, std::move(message_ids), std::move(query_));
   }
@@ -6573,9 +6573,9 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       }
     } else {
       CHECK(result->get_id() == td_api::message::ID);
-      auto full_message_id = client_->add_message(move_object_as<td_api::message>(result));
-      pinned_message_id = full_message_id.message_id;
-      CHECK(full_message_id.chat_id == chat_id_);
+      auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
+      pinned_message_id = message_full_id.message_id;
+      CHECK(message_full_id.chat_id == chat_id_);
       CHECK(pinned_message_id > 0);
     }
 
@@ -6642,9 +6642,9 @@ class Client::TdOnGetChatPinnedMessageToUnpinCallback final : public TdQueryCall
     }
 
     CHECK(result->get_id() == td_api::message::ID);
-    auto full_message_id = client_->add_message(move_object_as<td_api::message>(result));
-    pinned_message_id = full_message_id.message_id;
-    CHECK(full_message_id.chat_id == chat_id_);
+    auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
+    pinned_message_id = message_full_id.message_id;
+    CHECK(message_full_id.chat_id == chat_id_);
     CHECK(pinned_message_id > 0);
 
     client_->send_request(make_object<td_api::unpinChatMessage>(chat_id_, pinned_message_id),
@@ -11789,10 +11789,10 @@ td::int64 Client::extract_yet_unsent_message_query_id(int64 chat_id, int64 messa
 }
 
 void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, int64 old_message_id) {
-  auto full_message_id = add_message(std::move(message), true);
+  auto message_full_id = add_message(std::move(message), true);
 
-  int64 chat_id = full_message_id.chat_id;
-  int64 new_message_id = full_message_id.message_id;
+  int64 chat_id = message_full_id.chat_id;
+  int64 new_message_id = message_full_id.message_id;
   CHECK(new_message_id > 0);
 
   auto message_info = get_message(chat_id, new_message_id, true);
@@ -11862,8 +11862,8 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
 }
 
 void Client::on_story_send_succeeded(object_ptr<td_api::story> &&story, int64 old_story_id) {
-  auto full_story_id = FullMessageId{story->poster_chat_id_, old_story_id};
-  auto yet_unsent_story_it = yet_unsent_stories_.find(full_story_id);
+  auto story_full_id = MessageFullId{story->poster_chat_id_, old_story_id};
+  auto yet_unsent_story_it = yet_unsent_stories_.find(story_full_id);
   CHECK(yet_unsent_story_it != yet_unsent_stories_.end());
   auto query = std::move(yet_unsent_story_it->second.query);
   yet_unsent_stories_.erase(yet_unsent_story_it);
@@ -11871,8 +11871,8 @@ void Client::on_story_send_succeeded(object_ptr<td_api::story> &&story, int64 ol
 }
 
 void Client::on_story_send_failed(int64 chat_id, int64 story_id, object_ptr<td_api::error> &&error) {
-  auto full_story_id = FullMessageId{chat_id, story_id};
-  auto yet_unsent_story_it = yet_unsent_stories_.find(full_story_id);
+  auto story_full_id = MessageFullId{chat_id, story_id};
+  auto yet_unsent_story_it = yet_unsent_stories_.find(story_full_id);
   CHECK(yet_unsent_story_it != yet_unsent_stories_.end());
   auto query = std::move(yet_unsent_story_it->second.query);
   yet_unsent_stories_.erase(yet_unsent_story_it);
@@ -15130,7 +15130,7 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   int64 chat_id = message->chat_id_;
   int64 message_id = message->id_;
 
-  FullMessageId yet_unsent_message_id{chat_id, message_id};
+  MessageFullId yet_unsent_message_id{chat_id, message_id};
   YetUnsentMessage yet_unsent_message;
   yet_unsent_message.send_message_query_id = query_id;
   auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
@@ -15146,10 +15146,10 @@ void Client::on_sent_story(object_ptr<td_api::story> &&story, PromisedQueryPtr q
   int64 chat_id = story->poster_chat_id_;
   int64 story_id = story->id_;
 
-  FullMessageId full_story_id{chat_id, story_id};
+  MessageFullId story_full_id{chat_id, story_id};
   YetUnsentStory yet_unsent_story;
   yet_unsent_story.query = std::move(query);
-  auto emplace_result = yet_unsent_stories_.emplace(full_story_id, std::move(yet_unsent_story));
+  auto emplace_result = yet_unsent_stories_.emplace(story_full_id, std::move(yet_unsent_story));
   CHECK(emplace_result.second);
 }
 
@@ -16869,7 +16869,7 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
   return message_info;
 }
 
-Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
+Client::MessageFullId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
   CHECK(message != nullptr);
   CHECK(message->sending_state_ == nullptr);
 

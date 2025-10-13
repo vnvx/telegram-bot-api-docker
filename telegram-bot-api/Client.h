@@ -1193,27 +1193,27 @@ class Client final : public WebhookActor::Callback {
 
   void process_new_business_message_queue(const td::string &connection_id);
 
-  struct FullMessageId {
+  struct MessageFullId {
     int64 chat_id;
     int64 message_id;
 
-    FullMessageId() : chat_id(0), message_id(0) {
+    MessageFullId() : chat_id(0), message_id(0) {
     }
-    FullMessageId(int64 chat_id, int64 message_id) : chat_id(chat_id), message_id(message_id) {
+    MessageFullId(int64 chat_id, int64 message_id) : chat_id(chat_id), message_id(message_id) {
     }
 
-    bool operator==(const FullMessageId &other) const {
+    bool operator==(const MessageFullId &other) const {
       return chat_id == other.chat_id && message_id == other.message_id;
     }
   };
 
-  struct FullMessageIdHash {
-    td::uint32 operator()(FullMessageId full_message_id) const {
-      return td::Hash<int64>()(full_message_id.chat_id) * 2023654985u + td::Hash<int64>()(full_message_id.message_id);
+  struct MessageFullIdHash {
+    td::uint32 operator()(MessageFullId message_full_id) const {
+      return td::Hash<int64>()(message_full_id.chat_id) * 2023654985u + td::Hash<int64>()(message_full_id.message_id);
     }
   };
 
-  FullMessageId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
+  MessageFullId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
   void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
   MessageInfo *get_message_editable(int64 chat_id, int64 message_id);
@@ -1386,7 +1386,7 @@ class Client final : public WebhookActor::Callback {
 
   static td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  td::WaitFreeHashMap<FullMessageId, td::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;
+  td::WaitFreeHashMap<MessageFullId, td::unique_ptr<MessageInfo>, MessageFullIdHash> messages_;
   td::WaitFreeHashMap<int64, td::unique_ptr<UserInfo>> users_;
   td::WaitFreeHashMap<int64, td::unique_ptr<GroupInfo>> groups_;
   td::WaitFreeHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;
@@ -1399,14 +1399,14 @@ class Client final : public WebhookActor::Callback {
   struct YetUnsentMessage {
     int64 send_message_query_id = 0;
   };
-  td::FlatHashMap<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
+  td::FlatHashMap<MessageFullId, YetUnsentMessage, MessageFullIdHash> yet_unsent_messages_;
 
   td::FlatHashMap<int64, int32> yet_unsent_message_count_;  // chat_id -> count
 
   struct YetUnsentStory {
     PromisedQueryPtr query;
   };
-  td::FlatHashMap<FullMessageId, YetUnsentStory, FullMessageIdHash> yet_unsent_stories_;
+  td::FlatHashMap<MessageFullId, YetUnsentStory, MessageFullIdHash> yet_unsent_stories_;
 
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;
