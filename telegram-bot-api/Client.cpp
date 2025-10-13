@@ -242,6 +242,7 @@ bool Client::init_methods() {
   methods_.emplace("forwardmessages", &Client::process_forward_messages_query);
   methods_.emplace("sendmediagroup", &Client::process_send_media_group_query);
   methods_.emplace("sendchataction", &Client::process_send_chat_action_query);
+  methods_.emplace("sendmessagedraft", &Client::process_send_message_draft_query);
   methods_.emplace("setmessagereaction", &Client::process_set_message_reaction_query);
   methods_.emplace("editmessagetext", &Client::process_edit_message_text_query);
   methods_.emplace("editmessagelivelocation", &Client::process_edit_message_live_location_query);
@@ -12585,6 +12586,22 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
                send_request(
                    make_object<td_api::sendChatAction>(chat_id, make_object<td_api::messageTopicForum>(forum_topic_id),
                                                        td::string(), std::move(action)),
+                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_message_draft_query(PromisedQueryPtr &query) {
+  auto chat_id_str = query->arg("chat_id");
+  auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
+  auto draft_id = td::to_integer<int64>(query->arg("draft_id"));
+  TRY_RESULT(text, get_formatted_text(query->arg("text").str(), query->arg("parse_mode").str(),
+                                      get_input_entities(query.get(), "entities")));
+
+  check_chat(chat_id_str, AccessRights::Write, std::move(query),
+             [this, forum_topic_id, draft_id, text = std::move(text)](int64 chat_id, PromisedQueryPtr query) mutable {
+               send_request(
+                   make_object<td_api::sendTextMessageDraft>(chat_id, forum_topic_id, draft_id, std::move(text)),
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();

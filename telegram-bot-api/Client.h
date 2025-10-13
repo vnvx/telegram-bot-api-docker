@@ -754,6 +754,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_forward_messages_query(PromisedQueryPtr &query);
   td::Status process_send_media_group_query(PromisedQueryPtr &query);
   td::Status process_send_chat_action_query(PromisedQueryPtr &query);
+  td::Status process_send_message_draft_query(PromisedQueryPtr &query);
   td::Status process_set_message_reaction_query(PromisedQueryPtr &query);
   td::Status process_edit_message_text_query(PromisedQueryPtr &query);
   td::Status process_edit_message_live_location_query(PromisedQueryPtr &query);
