@@ -1128,14 +1128,14 @@ class Client final : public WebhookActor::Callback {
   const BusinessConnection *get_business_connection(const td::string &connection_id) const;
 
   static int64 get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to,
-                                                 int64 message_thread_id);
+                                                 int64 implicit_reply_to_message_id);
 
   static int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to,
-                                                 int64 message_thread_id);
+                                                 int64 implicit_reply_to_message_id);
 
-  static int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message);
+  int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) const;
 
-  static int64 get_same_chat_reply_to_message_id(const MessageInfo *message_info);
+  int64 get_same_chat_reply_to_message_id(const MessageInfo *message_info) const;
 
   static void drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 
@@ -1230,6 +1230,9 @@ class Client final : public WebhookActor::Callback {
                                 object_ptr<td_api::ReplyMarkup> &&reply_markup);
 
   int32 get_unix_time() const;
+
+  int64 get_implicit_reply_to_message_id(int64 chat_id, int64 message_id,
+                                         const td_api::object_ptr<td_api::MessageTopic> &topic_id) const;
 
   static int64 get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id);
 

@@ -3723,7 +3723,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("forward_date", message_->initial_send_date);
   }
   if (need_reply_) {
-    auto reply_to_message_id = get_same_chat_reply_to_message_id(message_);
+    auto reply_to_message_id = client_->get_same_chat_reply_to_message_id(message_);
     if (reply_to_message_id > 0) {
       // internal reply
       const MessageInfo *reply_to_message = !message_->business_connection_id.empty()
@@ -16379,21 +16379,21 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
 }
 
 td::int64 Client::get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to,
-                                                    int64 message_thread_id) {
+                                                    int64 implicit_reply_to_message_id) {
   if (reply_to != nullptr && reply_to->origin_ == nullptr) {
     CHECK(reply_to->message_id_ > 0);
     return reply_to->message_id_;
   }
-  return message_thread_id;
+  return implicit_reply_to_message_id;
 }
 
 td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to,
-                                                    int64 message_thread_id) {
+                                                    int64 implicit_reply_to_message_id) {
   if (reply_to != nullptr) {
     switch (reply_to->get_id()) {
       case td_api::messageReplyToMessage::ID:
         return get_same_chat_reply_to_message_id(static_cast<const td_api::messageReplyToMessage *>(reply_to.get()),
-                                                 message_thread_id);
+                                                 implicit_reply_to_message_id);
       case td_api::messageReplyToStory::ID:
         break;
       default:
@@ -16401,10 +16401,10 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::Mes
         break;
     }
   }
-  return message_thread_id;
+  return implicit_reply_to_message_id;
 }
 
-td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) {
+td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) const {
   auto content_message_id = [&] {
     switch (message->content_->get_id()) {
       case td_api::messagePinMessage::ID:
@@ -16454,18 +16454,17 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
     CHECK(message->reply_to_ == nullptr);
     return content_message_id;
   }
-  auto message_thread_id = get_message_thread_id(message->topic_id_);
-  return get_same_chat_reply_to_message_id(message->reply_to_,
-                                           message_thread_id < message->id_ ? message_thread_id : 0);
+  return get_same_chat_reply_to_message_id(
+      message->reply_to_, get_implicit_reply_to_message_id(message->chat_id_, message->id_, message->topic_id_));
 }
 
-td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_info) {
+td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_info) const {
   if (message_info == nullptr) {
     return 0;
   }
-  auto message_thread_id = get_message_thread_id(message_info->topic_id);
-  return get_same_chat_reply_to_message_id(message_info->reply_to_message.get(),
-                                           message_thread_id < message_info->id ? message_thread_id : 0);
+  return get_same_chat_reply_to_message_id(
+      message_info->reply_to_message.get(),
+      get_implicit_reply_to_message_id(message_info->chat_id, message_info->id, message_info->topic_id));
 }
 
 void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
@@ -17157,6 +17156,37 @@ td_api::object_ptr<td_api::PassportElementType> Client::get_passport_element_typ
 td::int32 Client::get_unix_time() const {
   CHECK(was_authorized_);
   return parameters_->shared_data_->get_unix_time(td::Time::now());
+}
+
+td::int64 Client::get_implicit_reply_to_message_id(int64 chat_id, int64 message_id,
+                                                   const td_api::object_ptr<td_api::MessageTopic> &topic_id) const {
+  if (topic_id == nullptr) {
+    return 0;
+  }
+  int64 implicit_reply_to_message_id = 0;
+  switch (topic_id->get_id()) {
+    case td_api::messageTopicThread::ID:
+      implicit_reply_to_message_id =
+          static_cast<const td_api::messageTopicThread *>(topic_id.get())->message_thread_id_;
+      break;
+    case td_api::messageTopicForum::ID: {
+      auto forum_topic_id = static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_;
+      auto chat_info = get_chat(chat_id);
+      if (chat_info->type != ChatInfo::Type::Supergroup || forum_topic_id == GENERAL_FORUM_TOPIC_ID) {
+        return 0;
+      }
+      implicit_reply_to_message_id = as_tdlib_message_id(forum_topic_id);
+      break;
+    }
+    case td_api::messageTopicDirectMessages::ID:
+      return 0;
+    case td_api::messageTopicSavedMessages::ID:
+      return 0;
+    default:
+      UNREACHABLE();
+      return 0;
+  }
+  return implicit_reply_to_message_id < message_id ? implicit_reply_to_message_id : 0;
 }
 
 td::int64 Client::get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
