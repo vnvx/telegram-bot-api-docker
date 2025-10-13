@@ -13578,6 +13578,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
         auto exclude_limited_upgradable = to_bool(query->arg("exclude_limited_upgradable"));
         auto exclude_limited_non_upgradable = to_bool(query->arg("exclude_limited_non_upgradable"));
         auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
+        auto exclude_hosted = to_bool(query->arg("exclude_from_blockchain"));
         auto sort_by_price = to_bool(query->arg("sort_by_price"));
         auto offset = query->arg("offset");
         auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
@@ -13588,7 +13589,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
         send_request(make_object<td_api::getReceivedGifts>(
                          business_connection->id_, make_object<td_api::messageSenderUser>(my_id_), 0, exclude_unsaved,
                          exclude_saved, exclude_unlimited, exclude_limited_upgradable, exclude_limited_non_upgradable,
-                         exclude_upgraded, false, false, sort_by_price, offset.str(), limit),
+                         exclude_upgraded, false, exclude_hosted, sort_by_price, offset.str(), limit),
                      td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
       });
   return td::Status::OK();
