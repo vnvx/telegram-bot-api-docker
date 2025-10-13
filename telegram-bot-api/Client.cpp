@@ -2562,6 +2562,9 @@ class Client::JsonForumTopicCreated final : public td::Jsonable {
     if (forum_topic_created_->icon_->custom_emoji_id_ != 0) {
       object("icon_custom_emoji_id", td::to_string(forum_topic_created_->icon_->custom_emoji_id_));
     }
+    if (forum_topic_created_->is_name_implicit_) {
+      object("is_name_implicit", td::JsonTrue());
+    }
   }
 
  private:
