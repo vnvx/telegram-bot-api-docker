@@ -362,8 +362,6 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckMessagesCallback;
   template <class OnSuccess>
-  class TdOnCheckMessageThreadCallback;
-  template <class OnSuccess>
   class TdOnCheckForumTopicCallback;
   template <class OnSuccess>
   class TdOnCheckBusinessConnectionCallback;
@@ -426,8 +424,9 @@ class Client final : public WebhookActor::Callback {
                       AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int64 message_thread_id,
-                              PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user = false);
+  void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int32 forum_topic_id,
+                              int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
+                              bool allow_unknown_user = false);
 
   template <class OnSuccess>
   void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success);
@@ -444,24 +443,35 @@ class Client final : public WebhookActor::Callback {
   void get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
 
   void send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler);
+
   void do_send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler);
+
   static object_ptr<td_api::Object> execute(object_ptr<td_api::Function> &&f);
+
   void on_update(object_ptr<td_api::Object> result);
+
   void on_result(td::uint64 id, object_ptr<td_api::Object> result);
 
   void on_update_authorization_state();
+
   void log_out(int32 error_code, td::Slice error_message);
+
   void on_closed();
+
   void finish_closing();
 
   void clear_tqueue();
 
   bool allow_update_before_authorization(const td_api::Object *update) const;
+
   void update_shared_unix_time_difference();
 
   void on_update_file(object_ptr<td_api::file> file);
 
   static bool to_bool(td::MutableSlice value);
+
+  static bool is_reply_in_same_topic(const object_ptr<td_api::MessageTopic> &reply_topic_id,
+                                     const object_ptr<td_api::MessageTopic> &topic_id);
 
   static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(CheckedReplyParameters &&reply_parameters);
 
