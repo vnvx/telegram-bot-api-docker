@@ -1234,7 +1234,7 @@ class Client final : public WebhookActor::Callback {
   int64 get_implicit_reply_to_message_id(int64 chat_id, int64 message_id,
                                          const td_api::object_ptr<td_api::MessageTopic> &topic_id) const;
 
-  static int64 get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id);
+  static int32 get_forum_topic_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id);
 
   static int64 as_tdlib_message_id(int32 message_id);
 

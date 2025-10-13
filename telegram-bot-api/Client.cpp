@@ -3676,9 +3676,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->edit_date > 0) {
     object("edit_date", message_->edit_date);
   }
-  auto message_thread_id = get_message_thread_id(message_->topic_id);
-  if (message_thread_id != 0) {
-    object("message_thread_id", as_client_message_id(message_thread_id));
+  auto forum_topic_id = get_forum_topic_id(message_->topic_id);
+  if (forum_topic_id != 0) {
+    object("message_thread_id", forum_topic_id);
   }
   if (message_->initial_send_date > 0) {
     CHECK(message_->forward_origin != nullptr);
@@ -7950,7 +7950,7 @@ bool Client::is_reply_in_same_topic(const object_ptr<td_api::MessageTopic> &repl
   switch (topic_id->get_id()) {
     case td_api::messageTopicForum::ID: {
       auto forum_topic_id = static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_;
-      return as_client_message_id(get_message_thread_id(reply_topic_id)) == forum_topic_id;
+      return get_forum_topic_id(reply_topic_id) == forum_topic_id;
     }
     case td_api::messageTopicDirectMessages::ID:
       // direct messages can't be answered in a different topic
@@ -17189,19 +17189,19 @@ td::int64 Client::get_implicit_reply_to_message_id(int64 chat_id, int64 message_
   return implicit_reply_to_message_id < message_id ? implicit_reply_to_message_id : 0;
 }
 
-td::int64 Client::get_message_thread_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
+td::int32 Client::get_forum_topic_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
   if (topic_id == nullptr) {
     return 0;
   }
   switch (topic_id->get_id()) {
     case td_api::messageTopicThread::ID:
-      return static_cast<const td_api::messageTopicThread *>(topic_id.get())->message_thread_id_;
+      return as_client_message_id(static_cast<const td_api::messageTopicThread *>(topic_id.get())->message_thread_id_);
     case td_api::messageTopicForum::ID: {
       auto forum_topic_id = static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_;
       if (forum_topic_id == GENERAL_FORUM_TOPIC_ID) {
         return 0;
       }
-      return as_tdlib_message_id(forum_topic_id);
+      return forum_topic_id;
     }
     case td_api::messageTopicDirectMessages::ID:
       return 0;
