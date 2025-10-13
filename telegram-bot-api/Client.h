@@ -364,6 +364,8 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckMessageThreadCallback;
   template <class OnSuccess>
+  class TdOnCheckForumTopicCallback;
+  template <class OnSuccess>
   class TdOnCheckBusinessConnectionCallback;
   template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
@@ -394,6 +396,10 @@ class Client final : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void check_message_topic(td::Slice chat_id_str, int32 forum_topic_id, int64 direct_messages_topic_id,
+                           PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user = false);
 
   static td::Result<int64> get_business_connection_chat_id(td::Slice chat_id_str);
 

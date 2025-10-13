@@ -6279,6 +6279,41 @@ class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
 };
 
 template <class OnSuccess>
+class Client::TdOnCheckForumTopicCallback final : public TdQueryCallback {
+ public:
+  TdOnCheckForumTopicCallback(Client *client, int64 chat_id, int32 forum_topic_id, PromisedQueryPtr query,
+                              OnSuccess on_success)
+      : client_(client)
+      , chat_id_(chat_id)
+      , forum_topic_id_(forum_topic_id)
+      , query_(std::move(query))
+      , on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      auto error = move_object_as<td_api::error>(result);
+      if (error->code_ == 429) {
+        LOG(WARNING) << "Failed to get forum topic " << forum_topic_id_ << " in " << chat_id_;
+      }
+      return fail_query_with_error(std::move(query_), std::move(error), "Message thread not found");
+    }
+
+    CHECK(result->get_id() == td_api::forumTopic::ID);
+    CHECK(result->info_->chat_id_ == chat_id_);
+    CHECK(result->info_->forum_topic_id_ == forum_topic_id_);
+    on_success_(chat_id_, make_object<td_api::messageTopicForum>(forum_topic_id_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  int64 chat_id_;
+  int32 forum_topic_id_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
 class Client::TdOnCheckRemoteFileIdCallback final : public TdQueryCallback {
  public:
   TdOnCheckRemoteFileIdCallback(PromisedQueryPtr query, OnSuccess on_success)
@@ -7758,6 +7793,39 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
   }
   send_request(make_object<td_api::getChat>(chat_id), td::make_unique<TdOnCheckChatNoFailCallback<OnSuccess>>(
                                                           chat_id, std::move(query), std::move(on_success)));
+}
+
+template <class OnSuccess>
+void Client::check_message_topic(td::Slice chat_id_str, int32 forum_topic_id, int64 direct_messages_topic_id,
+                                 PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user) {
+  check_chat(
+      chat_id_str, AccessRights::Write, std::move(query),
+      [this, forum_topic_id, direct_messages_topic_id, on_success = std::move(on_success)](
+          int64 chat_id, PromisedQueryPtr query) mutable {
+        if (forum_topic_id == 0 && direct_messages_topic_id == 0) {
+          return on_success(chat_id, nullptr, std::move(query));
+        }
+        auto chat_info = get_chat(chat_id);
+        CHECK(chat_info != nullptr || allow_unknown_user);
+        bool can_be_forum = false;
+        if (chat_info != nullptr && chat_info->type == ChatInfo::Type::Supergroup) {
+          auto supergrpup_info = get_supergroup_info(chat_info->supergroup_id) CHECK(supergroup_info != nullptr);
+          if (supergroup_info->is_direct_messages) {
+            return on_success(chat_id, make_object<td_api::messageTopicDirectMessages>(direct_messages_topic_id),
+                              std::move(query));
+          }
+          can_be_forum = supergroup_info->is_forum;
+        } else if (chat_info != nullptr && chat_info->type == ChatInfo::Type::User) {
+          can_be_forum = true;
+        }
+        if (can_be_forum && forum_topic_id != 0) {
+          return send_request(make_object<td_api::getForumTopic>(chat_id, forum_topic_id),
+                              td::make_unique<TdOnCheckForumTopicCallback<OnSuccess>>(
+                                  this, chat_id, forum_topic_id, std::move(query), std::move(on_success)));
+        }
+        return on_success(chat_id, nullptr, std::move(query));
+      },
+      allow_unknown_user && forum_topic_id == 0);
 }
 
 td::Result<td::int64> Client::get_business_connection_chat_id(td::Slice chat_id_str) {
