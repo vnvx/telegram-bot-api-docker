@@ -2818,6 +2818,7 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         object("origin", "gifted_upgrade");
         break;
       case td_api::upgradedGiftOriginBlockchain::ID:
+        LOG(ERROR) << "Receive a gift assigned from blockchain";
         object("origin", "blockchain");
         break;
       default:
