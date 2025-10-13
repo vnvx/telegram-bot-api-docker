@@ -978,6 +978,7 @@ class Client final : public WebhookActor::Callback {
     bool is_inline_bot = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
+    bool has_topics = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
   UserInfo *add_user_info(int64 user_id);
