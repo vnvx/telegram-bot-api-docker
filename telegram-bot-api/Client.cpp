@@ -12950,8 +12950,7 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   TRY_RESULT(content, get_input_story_content(query.get()));
   TRY_RESULT(areas, get_input_story_areas(query.get()));
-  TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
-                                         get_input_entities(query.get(), "caption_entities")));
+  TRY_RESULT(caption, get_caption(query.get()));
   check_business_connection(
       business_connection_id, std::move(query),
       [this, content = std::move(content), areas = std::move(areas), caption = std::move(caption)](
@@ -12997,8 +12996,7 @@ td::Status Client::process_edit_story_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   TRY_RESULT(content, get_input_story_content(query.get()));
   TRY_RESULT(areas, get_input_story_areas(query.get()));
-  TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
-                                         get_input_entities(query.get(), "caption_entities")));
+  TRY_RESULT(caption, get_caption(query.get()));
   check_business_connection(
       business_connection_id, std::move(query),
       [this, content = std::move(content), areas = std::move(areas), caption = std::move(caption)](
