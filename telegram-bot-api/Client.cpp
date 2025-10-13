@@ -1455,6 +1455,9 @@ class Client::JsonUniqueGift final : public td::Jsonable {
     if (gift_->colors_ != nullptr) {
       object("colors", JsonUniqueGiftColors(gift_->colors_.get()));
     }
+    if (gift_->host_id_ != nullptr) {
+      object("is_from_blockchain", td::JsonTrue());
+    }
   }
 
  private:
