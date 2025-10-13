@@ -148,7 +148,7 @@ td::Status WebhookActor::create_connection() {
       return create_webhook_error("Can't connect to the webhook proxy", r_proxy_socket_fd.move_as_error(), false);
     }
     if (!was_checked_) {
-      // verify webhook even we can't establish connection to the webhook
+      // verify webhook even if we can't establish connection to the webhook
       was_checked_ = true;
       on_webhook_verified();
     }

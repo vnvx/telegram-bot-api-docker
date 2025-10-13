@@ -699,8 +699,8 @@ class Client::JsonStickers final : public td::Jsonable {
 
 class Client::JsonLocation final : public td::Jsonable {
  public:
-  explicit JsonLocation(const td_api::location *location, double expires_in = 0.0, int32 live_period = 0,
-                        int32 heading = 0, int32 proximity_alert_radius = 0)
+  JsonLocation(const td_api::location *location, double expires_in = 0.0, int32 live_period = 0, int32 heading = 0,
+               int32 proximity_alert_radius = 0)
       : location_(location)
       , expires_in_(expires_in)
       , live_period_(live_period)
@@ -1358,8 +1358,7 @@ class Client::JsonGift final : public td::Jsonable {
 
 class Client::JsonGifts final : public td::Jsonable {
  public:
-  JsonGifts(const td::vector<td_api::object_ptr<td_api::gift>> &gifts, const Client *client)
-      : gifts_(gifts), client_(client) {
+  JsonGifts(const td::vector<object_ptr<td_api::gift>> &gifts, const Client *client) : gifts_(gifts), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -1367,7 +1366,7 @@ class Client::JsonGifts final : public td::Jsonable {
   }
 
  private:
-  const td::vector<td_api::object_ptr<td_api::gift>> &gifts_;
+  const td::vector<object_ptr<td_api::gift>> &gifts_;
   const Client *client_;
 };
 
@@ -16279,7 +16278,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     }
 
     if (!supergroup_info->is_supergroup && message->content_->get_id() == td_api::messageSupergroupChatCreate::ID) {
-      // don't send message about channel creation, even the bot was added at exactly the same time
+      // don't send message about channel creation, even if the bot was added at exactly the same time
       return true;
     }
   }
@@ -17160,7 +17159,7 @@ td::int32 Client::get_unix_time() const {
 }
 
 td::int64 Client::get_implicit_reply_to_message_id(int64 chat_id, int64 message_id,
-                                                   const td_api::object_ptr<td_api::MessageTopic> &topic_id) const {
+                                                   const object_ptr<td_api::MessageTopic> &topic_id) const {
   if (topic_id == nullptr) {
     return 0;
   }
@@ -17190,7 +17189,7 @@ td::int64 Client::get_implicit_reply_to_message_id(int64 chat_id, int64 message_
   return implicit_reply_to_message_id < message_id ? implicit_reply_to_message_id : 0;
 }
 
-td::int32 Client::get_forum_topic_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
+td::int32 Client::get_forum_topic_id(const object_ptr<td_api::MessageTopic> &topic_id) {
   if (topic_id == nullptr) {
     return 0;
   }

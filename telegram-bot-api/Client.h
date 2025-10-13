@@ -522,10 +522,10 @@ class Client final : public WebhookActor::Callback {
 
   object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query) const;
 
-  static td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
+  static td::Result<object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
       td::JsonValue &&value);
 
-  static td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
+  static td::Result<object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
       td::MutableSlice value);
 
   static td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query,
@@ -1232,9 +1232,9 @@ class Client final : public WebhookActor::Callback {
   int32 get_unix_time() const;
 
   int64 get_implicit_reply_to_message_id(int64 chat_id, int64 message_id,
-                                         const td_api::object_ptr<td_api::MessageTopic> &topic_id) const;
+                                         const object_ptr<td_api::MessageTopic> &topic_id) const;
 
-  static int32 get_forum_topic_id(const td_api::object_ptr<td_api::MessageTopic> &topic_id);
+  static int32 get_forum_topic_id(const object_ptr<td_api::MessageTopic> &topic_id);
 
   static int64 as_tdlib_message_id(int32 message_id);
 
