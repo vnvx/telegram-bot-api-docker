@@ -7891,7 +7891,11 @@ bool Client::have_message_access(int64 chat_id) const {
     case ChatInfo::Type::Supergroup: {
       auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
       CHECK(supergroup_info != nullptr);
-      return is_chat_member(supergroup_info->status);
+      if (!is_chat_member(supergroup_info->status)) {
+        LOG(DEBUG) << "Have no access to messages of " << chat_id;
+        return false;
+      }
+      return true;
     }
     case ChatInfo::Type::Unknown:
     default:
