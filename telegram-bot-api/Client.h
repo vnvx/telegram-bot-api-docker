@@ -1214,8 +1214,11 @@ class Client final : public WebhookActor::Callback {
   };
 
   MessageFullId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
+
   void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
+
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
+
   MessageInfo *get_message_editable(int64 chat_id, int64 message_id);
 
   td::unique_ptr<MessageInfo> create_business_message(td::string business_connection_id,
