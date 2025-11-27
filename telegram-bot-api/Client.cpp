@@ -2199,6 +2199,8 @@ class Client::JsonChecklistTask final : public td::Jsonable {
           break;
         }
         case td_api::messageSenderChat::ID: {
+          auto chat_id = static_cast<const td_api::messageSenderChat *>(task_->completed_by_.get())->chat_id_;
+          object("completed_by_chat", JsonChat(chat_id, client_));
           break;
         }
         default:
