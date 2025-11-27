@@ -2191,8 +2191,19 @@ class Client::JsonChecklistTask final : public td::Jsonable {
     if (!task_->text_->entities_.empty()) {
       object("text_entities", JsonVectorEntities(task_->text_->entities_, client_));
     }
-    if (task_->completed_by_user_id_ != 0 && task_->completion_date_ != 0) {
-      object("completed_by_user", JsonUser(task_->completed_by_user_id_, client_));
+    if (task_->completed_by_ != nullptr && task_->completion_date_ != 0) {
+      switch (task_->completed_by_->get_id()) {
+        case td_api::messageSenderUser::ID: {
+          auto user_id = static_cast<const td_api::messageSenderUser *>(task_->completed_by_.get())->user_id_;
+          object("completed_by_user", JsonUser(user_id, client_));
+          break;
+        }
+        case td_api::messageSenderChat::ID: {
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
       object("completion_date", task_->completion_date_);
     }
   }
@@ -11663,7 +11674,8 @@ td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_g
   TRY_RESULT(limited_gifts, object.get_required_bool_field("limited_gifts"));
   TRY_RESULT(upgraded_gifts, object.get_required_bool_field("unique_gifts"));
   TRY_RESULT(premium_subscription, object.get_required_bool_field("premium_subscription"));
-  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription);
+  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription,
+                                                false);
 }
 
 td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(const Query *query) {
