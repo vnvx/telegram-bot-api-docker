@@ -778,11 +778,13 @@ class Client::JsonReactionCount final : public td::Jsonable {
 
 class Client::JsonAcceptedGiftTypes final : public td::Jsonable {
  public:
-  JsonAcceptedGiftTypes(bool unlimited_gifts, bool limited_gifts, bool upgraded_gifts, bool premium_subscription)
+  JsonAcceptedGiftTypes(bool unlimited_gifts, bool limited_gifts, bool upgraded_gifts, bool premium_subscription,
+                        bool gifts_from_channels)
       : unlimited_gifts_(unlimited_gifts)
       , limited_gifts_(limited_gifts)
       , upgraded_gifts_(upgraded_gifts)
-      , premium_subscription_(premium_subscription) {
+      , premium_subscription_(premium_subscription)
+      , gifts_from_channels_(gifts_from_channels) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -790,6 +792,7 @@ class Client::JsonAcceptedGiftTypes final : public td::Jsonable {
     object("limited_gifts", td::JsonBool(limited_gifts_));
     object("unique_gifts", td::JsonBool(upgraded_gifts_));
     object("premium_subscription", td::JsonBool(premium_subscription_));
+    object("gifts_from_channels", td::JsonBool(gifts_from_channels_));
   }
 
  private:
@@ -797,6 +800,7 @@ class Client::JsonAcceptedGiftTypes final : public td::Jsonable {
   bool limited_gifts_;
   bool upgraded_gifts_;
   bool premium_subscription_;
+  bool gifts_from_channels_;
 };
 
 class Client::JsonBirthdate final : public td::Jsonable {
@@ -1095,7 +1099,8 @@ class Client::JsonChat final : public td::Jsonable {
           object("accepted_gift_types", JsonAcceptedGiftTypes(user_info->accepted_gift_types->unlimited_gifts_,
                                                               user_info->accepted_gift_types->limited_gifts_,
                                                               user_info->accepted_gift_types->upgraded_gifts_,
-                                                              user_info->accepted_gift_types->premium_subscription_));
+                                                              user_info->accepted_gift_types->premium_subscription_,
+                                                              user_info->accepted_gift_types->gifts_from_channels_));
           if (user_info->birthdate != nullptr) {
             object("birthdate", JsonBirthdate(user_info->birthdate.get()));
           }
@@ -1133,7 +1138,7 @@ class Client::JsonChat final : public td::Jsonable {
             permissions->can_send_other_messages_ && permissions->can_add_link_previews_ &&
             permissions->can_change_info_ && permissions->can_invite_users_ && permissions->can_pin_messages_;
         object("all_members_are_administrators", td::JsonBool(everyone_is_administrator));
-        object("accepted_gift_types", JsonAcceptedGiftTypes(false, false, false, false));
+        object("accepted_gift_types", JsonAcceptedGiftTypes(false, false, false, false, false));
         photo = group_info->photo.get();
         break;
       }
@@ -1230,7 +1235,7 @@ class Client::JsonChat final : public td::Jsonable {
           }
           object("accepted_gift_types",
                  JsonAcceptedGiftTypes(supergroup_info->can_send_gift, supergroup_info->can_send_gift,
-                                       supergroup_info->can_send_gift, false));
+                                       supergroup_info->can_send_gift, false, supergroup_info->can_send_gift));
         }
         photo = supergroup_info->photo.get();
         break;
@@ -11676,8 +11681,9 @@ td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_g
   TRY_RESULT(limited_gifts, object.get_required_bool_field("limited_gifts"));
   TRY_RESULT(upgraded_gifts, object.get_required_bool_field("unique_gifts"));
   TRY_RESULT(premium_subscription, object.get_required_bool_field("premium_subscription"));
+  TRY_RESULT(gifts_from_channels, object.get_required_bool_field("gifts_from_channels"));
   return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription,
-                                                false);
+                                                gifts_from_channels);
 }
 
 td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(const Query *query) {
