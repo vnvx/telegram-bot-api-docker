@@ -11716,9 +11716,12 @@ td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_g
   TRY_RESULT(limited_gifts, object.get_required_bool_field("limited_gifts"));
   TRY_RESULT(upgraded_gifts, object.get_required_bool_field("unique_gifts"));
   TRY_RESULT(premium_subscription, object.get_required_bool_field("premium_subscription"));
-  TRY_RESULT(gifts_from_channels, object.get_optional_bool_field("gifts_from_channels"));
-  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription,
-                                                gifts_from_channels);
+  bool gifts_from_channels = true;
+  if (object.has_field("gifts_from_channels")) {
+    TRY_RESULT_ASSIGN(gifts_from_channels, object.get_optional_bool_field("gifts_from_channels"));
+  }
+  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts,
+                                                gifts_from_channels, premium_subscription);
 }
 
 td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(const Query *query) {
