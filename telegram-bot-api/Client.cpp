@@ -12502,12 +12502,13 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
   }
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
+  auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
   auto remove_caption = to_bool(query->arg("remove_caption"));
 
-  auto send_options =
-      get_message_send_options(disable_notification, protect_content, false, 0, std::move(input_suggested_post_info));
+  auto send_options = get_message_send_options(disable_notification, protect_content, false, effect_id,
+                                               std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options),
                      remove_caption](int64 chat_id, object_ptr<td_api::MessageTopic> topic_id, CheckedReplyParameters,
@@ -12568,11 +12569,12 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
   }
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
+  auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
 
-  auto send_options =
-      get_message_send_options(disable_notification, protect_content, false, 0, std::move(input_suggested_post_info));
+  auto send_options = get_message_send_options(disable_notification, protect_content, false, effect_id,
+                                               std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options)](int64 chat_id, object_ptr<td_api::MessageTopic> topic_id,
                                                              CheckedReplyParameters, PromisedQueryPtr query) mutable {
