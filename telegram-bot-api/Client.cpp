@@ -5181,6 +5181,9 @@ class Client::JsonReceivedGift final : public td::Jsonable {
     if (received_gift_->is_upgrade_separate_) {
       object("is_upgrade_separate", td::JsonTrue());
     }
+    if (received_gift_->unique_gift_number_ > 0) {
+      object("unique_gift_number", received_gift_->unique_gift_number_);
+    }
   }
 
  private:
