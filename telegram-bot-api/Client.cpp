@@ -1235,7 +1235,8 @@ class Client::JsonChat final : public td::Jsonable {
           }
           object("accepted_gift_types",
                  JsonAcceptedGiftTypes(supergroup_info->can_send_gift, supergroup_info->can_send_gift,
-                                       supergroup_info->can_send_gift, false, supergroup_info->can_send_gift));
+                                       supergroup_info->can_send_gift, supergroup_info->can_send_gift,
+                                       supergroup_info->can_send_gift));
         }
         photo = supergroup_info->photo.get();
         break;
@@ -2838,6 +2839,9 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         LOG(ERROR) << "Receive a gift assigned from blockchain";
         object("origin", "blockchain");
         break;
+      case td_api::upgradedGiftOriginOffer::ID:
+        object("origin", "offer");
+        break;
       default:
         UNREACHABLE();
     }
@@ -4234,6 +4238,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     }
     case td_api::messageSuggestBirthdate::ID:
+      break;
+    case td_api::messageUpgradedGiftPurchaseOffer::ID:
+      break;
+    case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
       break;
     default:
       UNREACHABLE();
@@ -11681,7 +11689,7 @@ td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_g
   TRY_RESULT(limited_gifts, object.get_required_bool_field("limited_gifts"));
   TRY_RESULT(upgraded_gifts, object.get_required_bool_field("unique_gifts"));
   TRY_RESULT(premium_subscription, object.get_required_bool_field("premium_subscription"));
-  TRY_RESULT(gifts_from_channels, object.get_required_bool_field("gifts_from_channels"));
+  TRY_RESULT(gifts_from_channels, object.get_optional_bool_field("gifts_from_channels"));
   return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription,
                                                 gifts_from_channels);
 }
@@ -12655,8 +12663,9 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
   check_chat(chat_id_str, AccessRights::Write, std::move(query),
              [this, forum_topic_id, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
                send_request(
-                   make_object<td_api::sendChatAction>(chat_id, make_object<td_api::messageTopicForum>(forum_topic_id),
-                                                       td::string(), std::move(action)),
+                   make_object<td_api::sendChatAction>(
+                       chat_id, forum_topic_id != 0 ? make_object<td_api::messageTopicForum>(forum_topic_id) : nullptr,
+                       td::string(), std::move(action)),
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -16357,48 +16366,29 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
              content->watcher_id_->get_id() != td_api::messageSenderUser::ID;
     }
     case td_api::messageGameScore::ID:
-      return true;
     case td_api::messagePaymentSuccessful::ID:
-      return true;
     case td_api::messagePassportDataSent::ID:
-      return true;
     case td_api::messageCall::ID:
-      return true;
     case td_api::messageUnsupported::ID:
-      return true;
     case td_api::messageContactRegistered::ID:
-      return true;
     case td_api::messageExpiredPhoto::ID:
-      return true;
     case td_api::messageExpiredVideo::ID:
-      return true;
     case td_api::messageExpiredVideoNote::ID:
-      return true;
     case td_api::messageExpiredVoiceNote::ID:
-      return true;
     case td_api::messageCustomServiceAction::ID:
-      return true;
     case td_api::messageChatSetTheme::ID:
-      return true;
     case td_api::messageWebAppDataSent::ID:
-      return true;
     case td_api::messageGiftedPremium::ID:
-      return true;
     case td_api::messageSuggestProfilePhoto::ID:
-      return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
     case td_api::messageGiftedStars::ID:
-      return true;
     case td_api::messageGiveawayPrizeStars::ID:
-      return true;
     case td_api::messagePaidMessagesRefunded::ID:
-      return true;
     case td_api::messageGroupCall::ID:
-      return true;
     case td_api::messageGiftedTon::ID:
-      return true;
     case td_api::messageSuggestBirthdate::ID:
+    case td_api::messageUpgradedGiftPurchaseOffer::ID:
+    case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
       return true;
     default:
       break;
@@ -16482,6 +16472,9 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
         }
         return static_cast<int64>(0);
       }
+      case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
+        return static_cast<const td_api::messageUpgradedGiftPurchaseOfferDeclined *>(message->content_.get())
+            ->offer_message_id_;
       default:
         return static_cast<int64>(0);
     }
