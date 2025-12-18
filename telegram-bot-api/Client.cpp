@@ -14230,6 +14230,10 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_delete_stories = to_bool(query->arg("can_delete_stories"));
   auto can_manage_direct_messages = to_bool(query->arg("can_manage_direct_messages"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
+  auto is_promotion = can_manage_chat || can_change_info || can_post_messages || can_edit_messages ||
+                      can_delete_messages || can_invite_users || can_restrict_members || can_pin_messages ||
+                      can_manage_topics || can_promote_members || can_manage_video_chats || can_post_stories ||
+                      can_edit_stories || can_delete_stories || can_manage_direct_messages || is_anonymous;
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true,
       make_object<td_api::chatAdministratorRights>(
@@ -14237,12 +14241,17 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
           can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats,
           can_post_stories, can_edit_stories, can_delete_stories, can_manage_direct_messages, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
+             [this, user_id, status = std::move(status), is_promotion](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
                CHECK(chat_info != nullptr);
                if (chat_info->type != ChatInfo::Type::Supergroup) {
                  return fail_query(400, "Bad Request: method is available for supergroup and channel chats only",
                                    std::move(query));
+               }
+               auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
+               if (supergroup_info != nullptr && !supergroup_info->is_supergroup && is_promotion &&
+                   !query->has_arg("can_restrict_members")) {
+                 status->rights_->can_restrict_members_ = true;
                }
 
                get_chat_member(
