@@ -1326,6 +1326,21 @@ class Client::JsonChat final : public td::Jsonable {
   int64 pinned_message_id_;
 };
 
+class Client::JsonGiftBackground final : public td::Jsonable {
+ public:
+  explicit JsonGiftBackground(const td_api::giftBackground *background) : background_(background) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("center_color", background_->center_color_);
+    object("edge_color", background_->edge_color_);
+    object("text_color", background_->text_color_);
+  }
+
+ private:
+  const td_api::giftBackground *background_;
+};
+
 class Client::JsonGift final : public td::Jsonable {
  public:
   JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
@@ -1357,6 +1372,9 @@ class Client::JsonGift final : public td::Jsonable {
     }
     if (gift_->upgrade_variant_count_ > 0) {
       object("unique_gift_variant_count", gift_->upgrade_variant_count_);
+    }
+    if (gift_->background_ != nullptr) {
+      object("background", JsonGiftBackground(gift_->background_.get()));
     }
   }
 

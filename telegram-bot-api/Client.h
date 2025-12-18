@@ -185,6 +185,7 @@ class Client final : public WebhookActor::Callback {
   class JsonForumTopicInfo;
   class JsonGameHighScore;
   class JsonGift;
+  class JsonGiftBackground;
   class JsonGifts;
   class JsonUniqueGiftModel;
   class JsonUniqueGiftSymbol;
