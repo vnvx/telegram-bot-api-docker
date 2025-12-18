@@ -1355,6 +1355,9 @@ class Client::JsonGift final : public td::Jsonable {
     if (gift_->has_colors_) {
       object("has_colors", td::JsonTrue());
     }
+    if (gift_->upgrade_variant_count_ > 0) {
+      object("unique_gift_variant_count", gift_->upgrade_variant_count_);
+    }
   }
 
  private:
