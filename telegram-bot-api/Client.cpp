@@ -296,6 +296,7 @@ bool Client::init_methods() {
   methods_.emplace("transferbusinessaccountstars", &Client::process_transfer_business_account_stars_query);
   methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
   methods_.emplace("getusergifts", &Client::process_get_user_gifts_query);
+  methods_.emplace("getchatgifts", &Client::process_get_chat_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
   methods_.emplace("transfergift", &Client::process_transfer_gift_query);
@@ -5128,12 +5129,12 @@ class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
 
 class Client::JsonReceivedGift final : public td::Jsonable {
  public:
-  JsonReceivedGift(const td_api::receivedGift *received_gift, const Client *client)
-      : received_gift_(received_gift), client_(client) {
+  JsonReceivedGift(const td_api::receivedGift *received_gift, bool can_be_managed, const Client *client)
+      : received_gift_(received_gift), can_be_managed_(can_be_managed), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    if (!received_gift_->received_gift_id_.empty()) {
+    if (!received_gift_->received_gift_id_.empty() && can_be_managed_) {
       object("owned_gift_id", received_gift_->received_gift_id_);
     }
     switch (received_gift_->gift_->get_id()) {
@@ -5212,20 +5213,22 @@ class Client::JsonReceivedGift final : public td::Jsonable {
 
  private:
   const td_api::receivedGift *received_gift_;
+  bool can_be_managed_;
   const Client *client_;
 };
 
 class Client::JsonReceivedGifts final : public td::Jsonable {
  public:
-  JsonReceivedGifts(const td_api::receivedGifts *received_gifts, const Client *client)
-      : received_gifts_(received_gifts), client_(client) {
+  JsonReceivedGifts(const td_api::receivedGifts *received_gifts, bool can_be_managed, const Client *client)
+      : received_gifts_(received_gifts), can_be_managed_(can_be_managed), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("total_count", received_gifts_->total_count_);
-    object("gifts", td::json_array(received_gifts_->gifts_, [client = client_](const auto &received_gift) {
-             return JsonReceivedGift(received_gift.get(), client);
-           }));
+    object("gifts", td::json_array(received_gifts_->gifts_,
+                                   [can_be_managed = can_be_managed_, client = client_](const auto &received_gift) {
+                                     return JsonReceivedGift(received_gift.get(), can_be_managed, client);
+                                   }));
     if (!received_gifts_->next_offset_.empty()) {
       object("next_offset", received_gifts_->next_offset_);
     }
@@ -5233,6 +5236,7 @@ class Client::JsonReceivedGifts final : public td::Jsonable {
 
  private:
   const td_api::receivedGifts *received_gifts_;
+  bool can_be_managed_;
   const Client *client_;
 };
 
@@ -7059,8 +7063,8 @@ class Client::TdOnGetStarAmountCallback final : public TdQueryCallback {
 
 class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
  public:
-  TdOnGetReceivedGiftsCallback(const Client *client, PromisedQueryPtr query)
-      : client_(client), query_(std::move(query)) {
+  TdOnGetReceivedGiftsCallback(const Client *client, bool can_be_managed, PromisedQueryPtr query)
+      : client_(client), can_be_managed_(can_be_managed), query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -7070,11 +7074,12 @@ class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::receivedGifts::ID);
     auto gifts = move_object_as<td_api::receivedGifts>(result);
-    answer_query(JsonReceivedGifts(gifts.get(), client_), std::move(query_));
+    answer_query(JsonReceivedGifts(gifts.get(), can_be_managed_, client_), std::move(query_));
   }
 
  private:
   const Client *client_;
+  bool can_be_managed_;
   PromisedQueryPtr query_;
 };
 
@@ -13703,7 +13708,7 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
                          business_connection->id_, make_object<td_api::messageSenderUser>(my_id_), 0, exclude_unsaved,
                          exclude_saved, exclude_unlimited, exclude_limited_upgradable, exclude_limited_non_upgradable,
                          exclude_upgraded, false, exclude_hosted, sort_by_price, offset.str(), limit),
-                     td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
+                     td::make_unique<TdOnGetReceivedGiftsCallback>(this, true, std::move(query)));
       });
   return td::Status::OK();
 }
@@ -13723,7 +13728,29 @@ td::Status Client::process_get_user_gifts_query(PromisedQueryPtr &query) {
                                                        true, false, exclude_unlimited, exclude_limited_upgradable,
                                                        exclude_limited_non_upgradable, exclude_upgraded, false,
                                                        exclude_hosted, sort_by_price, offset.str(), limit),
-                 td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
+                 td::make_unique<TdOnGetReceivedGiftsCallback>(this, false, std::move(query)));
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_chat_gifts_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    auto exclude_unsaved = to_bool(query->arg("exclude_unsaved"));
+    auto exclude_saved = to_bool(query->arg("exclude_saved"));
+    auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
+    auto exclude_limited_upgradable = to_bool(query->arg("exclude_limited_upgradable"));
+    auto exclude_limited_non_upgradable = to_bool(query->arg("exclude_limited_non_upgradable"));
+    auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
+    auto exclude_hosted = to_bool(query->arg("exclude_from_blockchain"));
+    auto sort_by_price = to_bool(query->arg("sort_by_price"));
+    auto offset = query->arg("offset");
+    auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+    send_request(make_object<td_api::getReceivedGifts>(
+                     td::string(), make_object<td_api::messageSenderChat>(chat_id), 0, exclude_unsaved, exclude_saved,
+                     exclude_unlimited, exclude_limited_upgradable, exclude_limited_non_upgradable, exclude_upgraded,
+                     false, exclude_hosted, sort_by_price, offset.str(), limit),
+                 td::make_unique<TdOnGetReceivedGiftsCallback>(this, false, std::move(query)));
   });
   return td::Status::OK();
 }
