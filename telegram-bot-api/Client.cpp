@@ -295,6 +295,7 @@ bool Client::init_methods() {
   methods_.emplace("getbusinessaccountstarbalance", &Client::process_get_business_account_star_balance_query);
   methods_.emplace("transferbusinessaccountstars", &Client::process_transfer_business_account_stars_query);
   methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
+  methods_.emplace("getusergifts", &Client::process_get_user_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
   methods_.emplace("transfergift", &Client::process_transfer_gift_query);
@@ -5132,7 +5133,9 @@ class Client::JsonReceivedGift final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("owned_gift_id", received_gift_->received_gift_id_);
+    if (!received_gift_->received_gift_id_.empty()) {
+      object("owned_gift_id", received_gift_->received_gift_id_);
+    }
     switch (received_gift_->gift_->get_id()) {
       case td_api::sentGiftRegular::ID: {
         auto gift = static_cast<const td_api::sentGiftRegular *>(received_gift_->gift_.get());
@@ -11720,8 +11723,8 @@ td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_g
   if (object.has_field("gifts_from_channels")) {
     TRY_RESULT_ASSIGN(gifts_from_channels, object.get_optional_bool_field("gifts_from_channels"));
   }
-  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts,
-                                                gifts_from_channels, premium_subscription);
+  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, gifts_from_channels,
+                                                premium_subscription);
 }
 
 td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(const Query *query) {
@@ -13702,6 +13705,26 @@ td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &qu
                          exclude_upgraded, false, exclude_hosted, sort_by_price, offset.str(), limit),
                      td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_user_gifts_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+    auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
+    auto exclude_limited_upgradable = to_bool(query->arg("exclude_limited_upgradable"));
+    auto exclude_limited_non_upgradable = to_bool(query->arg("exclude_limited_non_upgradable"));
+    auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
+    auto exclude_hosted = to_bool(query->arg("exclude_from_blockchain"));
+    auto sort_by_price = to_bool(query->arg("sort_by_price"));
+    auto offset = query->arg("offset");
+    auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+    send_request(make_object<td_api::getReceivedGifts>(td::string(), make_object<td_api::messageSenderUser>(user_id), 0,
+                                                       true, false, exclude_unlimited, exclude_limited_upgradable,
+                                                       exclude_limited_non_upgradable, exclude_upgraded, false,
+                                                       exclude_hosted, sort_by_price, offset.str(), limit),
+                 td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
+  });
   return td::Status::OK();
 }
 

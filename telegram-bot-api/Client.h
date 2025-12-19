@@ -823,6 +823,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_get_business_account_star_balance_query(PromisedQueryPtr &query);
   td::Status process_transfer_business_account_stars_query(PromisedQueryPtr &query);
   td::Status process_get_business_account_gifts_query(PromisedQueryPtr &query);
+  td::Status process_get_user_gifts_query(PromisedQueryPtr &query);
   td::Status process_convert_gift_to_stars_query(PromisedQueryPtr &query);
   td::Status process_upgrade_gift_query(PromisedQueryPtr &query);
   td::Status process_transfer_gift_query(PromisedQueryPtr &query);
