@@ -5982,6 +5982,26 @@ class Client::TdOnPostStoryCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnRepostStoryCallback final : public TdQueryCallback {
+ public:
+  TdOnRepostStoryCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::story::ID);
+    auto story = move_object_as<td_api::story>(result);
+    answer_query(JsonStory(story->poster_chat_id_, story->id_, client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnGetStoryCallback final : public TdQueryCallback {
  public:
   TdOnGetStoryCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
@@ -13106,7 +13126,7 @@ td::Status Client::process_repost_story_query(PromisedQueryPtr &query) {
                                       make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
                                       active_period, make_object<td_api::storyFullId>(from_chat_id, from_story_id),
                                       is_posted_to_chat_page, protect_content),
-                                  td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+                                  td::make_unique<TdOnRepostStoryCallback>(this, std::move(query)));
                    });
       });
   return td::Status::OK();

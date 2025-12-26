@@ -260,6 +260,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnStopPollCallback;
   class TdOnStopBusinessPollCallback;
   class TdOnPostStoryCallback;
+  class TdOnRepostStoryCallback;
   class TdOnGetStoryCallback;
   class TdOnOkQueryCallback;
   class TdOnGetReplyMessageCallback;
