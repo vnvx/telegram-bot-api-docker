@@ -1112,6 +1112,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (user_info->rating != nullptr) {
             object("rating", JsonUserRating(user_info->rating.get()));
           }
+          if (user_info->paid_message_star_count > 0) {
+            object("paid_message_star_count", user_info->paid_message_star_count);
+          }
         }
         photo = user_info->photo.get();
         break;
@@ -1239,6 +1242,9 @@ class Client::JsonChat final : public td::Jsonable {
                  JsonAcceptedGiftTypes(supergroup_info->can_send_gift, supergroup_info->can_send_gift,
                                        supergroup_info->can_send_gift, supergroup_info->can_send_gift,
                                        supergroup_info->can_send_gift));
+          if (supergroup_info->paid_message_star_count) {
+            object("paid_message_star_count", supergroup_info->paid_message_star_count);
+          }
         }
         photo = supergroup_info->photo.get();
         break;
@@ -15528,6 +15534,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
     user_info->editable_username = std::move(user->usernames_->editable_username_);
   }
   user_info->language_code = std::move(user->language_code_);
+  user_info->paid_message_star_count = user->paid_message_star_count_;
   user_info->have_access = user->have_access_;
   user_info->is_premium = user->is_premium_;
   user_info->added_to_attachment_menu = user->added_to_attachment_menu_;
@@ -15604,6 +15611,7 @@ void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::
   }
   supergroup_info->date = supergroup->date_;
   supergroup_info->status = std::move(supergroup->status_);
+  supergroup_info->paid_message_star_count = supergroup->paid_message_star_count_;
   supergroup_info->is_supergroup = !supergroup->is_channel_;
   supergroup_info->is_forum = supergroup->is_forum_;
   supergroup_info->is_direct_messages = supergroup->is_direct_messages_group_;
