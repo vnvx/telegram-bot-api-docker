@@ -552,14 +552,12 @@ td::Status WebhookActor::send_update() {
 
   td::HttpHeaderCreator hc;
   hc.init_post(url_.query_);
-
-  auto hostHeaderValue = url_.host_;
-  // Append :port to the host header if a non-default port was specified.
-  if ((url_.protocol_ == td::HttpUrl::Protocol::Https && url_.port_ != 443) || (url_.protocol_ == td::HttpUrl::Protocol::Http && url_.port_ != 80)) {
-    hostHeaderValue += ":" + std::to_string(url_.port_);
+  if ((url_.protocol_ == td::HttpUrl::Protocol::Https && url_.port_ == 443) ||
+      (url_.protocol_ == td::HttpUrl::Protocol::Http && url_.port_ == 80)) {
+    hc.add_header("Host", url_.host_);
+  } else {
+    hc.add_header("Host", PSLICE() << url_.host_ << ':' << url_.port_);
   }
-
-  hc.add_header("Host", hostHeaderValue);
   if (!url_.userinfo_.empty()) {
     hc.add_header("Authorization", PSLICE() << "Basic " << td::base64_encode(url_.userinfo_));
   }
