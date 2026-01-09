@@ -3636,6 +3636,9 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
                                           content->heading_, content->proximity_alert_radius_));
           break;
         }
+        case td_api::messageStakeDice::ID: {
+          break;
+        }
         case td_api::messageVenue::ID: {
           auto content = static_cast<const td_api::messageVenue *>(reply_->content_.get());
           object("venue", JsonVenue(content->venue_.get()));
@@ -3900,6 +3903,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messageLocation *>(message_->content.get());
       object("location", JsonLocation(content->location_.get(), content->expires_in_, content->live_period_,
                                       content->heading_, content->proximity_alert_radius_));
+      break;
+    }
+    case td_api::messageStakeDice::ID: {
       break;
     }
     case td_api::messageVenue::ID: {
@@ -4273,7 +4279,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
       break;
-    case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
+    case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
       break;
     default:
       UNREACHABLE();
@@ -16507,7 +16513,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedTon::ID:
     case td_api::messageSuggestBirthdate::ID:
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
-    case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
+    case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
       return true;
     default:
       break;
@@ -16591,8 +16597,8 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
         }
         return static_cast<int64>(0);
       }
-      case td_api::messageUpgradedGiftPurchaseOfferDeclined::ID:
-        return static_cast<const td_api::messageUpgradedGiftPurchaseOfferDeclined *>(message->content_.get())
+      case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
+        return static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(message->content_.get())
             ->offer_message_id_;
       default:
         return static_cast<int64>(0);
