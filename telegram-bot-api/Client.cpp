@@ -13306,7 +13306,7 @@ td::Status Client::process_verify_chat_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_remove_user_verification_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
-  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+  check_user_no_fail(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
     send_request(
         make_object<td_api::removeMessageSenderBotVerification>(0, make_object<td_api::messageSenderUser>(user_id)),
         td::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -13316,7 +13316,7 @@ td::Status Client::process_remove_user_verification_query(PromisedQueryPtr &quer
 
 td::Status Client::process_remove_chat_verification_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+  check_chat_no_fail(chat_id, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     send_request(
         make_object<td_api::removeMessageSenderBotVerification>(0, make_object<td_api::messageSenderChat>(chat_id)),
         td::make_unique<TdOnOkQueryCallback>(std::move(query)));
