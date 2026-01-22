@@ -168,7 +168,9 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
       }
       break;
     default:
-      LOG(ERROR) << "Unsupported error " << real_error_code << ": " << real_error_message << " from " << *query;
+      if (!(error_code == 406 && error_message == "FROZEN_METHOD_INVALID")) {
+        LOG(ERROR) << "Unsupported error " << real_error_code << ": " << real_error_message << " from " << *query;
+      }
       return fail_query(400, PSLICE() << "Bad Request: " << error_message, std::move(query));
   }
 
