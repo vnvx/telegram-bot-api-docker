@@ -212,6 +212,7 @@ bool Client::init_methods() {
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
   methods_.emplace("getmyname", &Client::process_get_my_name_query);
   methods_.emplace("setmyname", &Client::process_set_my_name_query);
+  methods_.emplace("setmyprofilephoto", &Client::process_set_my_profile_photo_query);
   methods_.emplace("getmydescription", &Client::process_get_my_description_query);
   methods_.emplace("setmydescription", &Client::process_set_my_description_query);
   methods_.emplace("getmyshortdescription", &Client::process_get_my_short_description_query);
@@ -12272,6 +12273,13 @@ td::Status Client::process_set_my_name_query(PromisedQueryPtr &query) {
   auto language_code = query->arg("language_code");
   auto name = query->arg("name");
   send_request(make_object<td_api::setBotName>(my_id_, language_code.str(), name.str()),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_my_profile_photo_query(PromisedQueryPtr &query) {
+  TRY_RESULT(photo, get_input_chat_photo(query.get()));
+  send_request(make_object<td_api::setProfilePhoto>(std::move(photo), false),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
