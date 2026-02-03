@@ -9059,104 +9059,103 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   return std::move(result);
 }
 
+td::Result<td_api::object_ptr<td_api::KeyboardButtonType>> Client::get_keyboard_button_type(td::JsonObject &object) {
+  TRY_RESULT(request_phone_number, object.get_optional_bool_field("request_phone_number"));
+  TRY_RESULT(request_contact, object.get_optional_bool_field("request_contact"));
+  if (request_phone_number || request_contact) {
+    return make_object<td_api::keyboardButtonTypeRequestPhoneNumber>();
+  }
+
+  TRY_RESULT(request_location, object.get_optional_bool_field("request_location"));
+  if (request_location) {
+    return make_object<td_api::keyboardButtonTypeRequestLocation>();
+  }
+
+  if (object.has_field("request_poll")) {
+    bool force_regular = false;
+    bool force_quiz = false;
+    TRY_RESULT(request_poll, object.extract_required_field("request_poll", td::JsonValue::Type::Object));
+    auto &request_poll_object = request_poll.get_object();
+    if (request_poll_object.has_field("type")) {
+      TRY_RESULT(type, request_poll_object.get_optional_string_field("type"));
+      if (type == "quiz") {
+        force_quiz = true;
+      } else if (type == "regular") {
+        force_regular = true;
+      }
+    }
+    return make_object<td_api::keyboardButtonTypeRequestPoll>(force_regular, force_quiz);
+  }
+
+  if (object.has_field("web_app")) {
+    TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
+    auto &web_app_object = web_app.get_object();
+    TRY_RESULT(url, web_app_object.get_required_string_field("url"));
+    return make_object<td_api::keyboardButtonTypeWebApp>(url);
+  }
+
+  if (object.has_field("request_user") || object.has_field("request_users")) {
+    td::JsonValue request_user;
+    if (object.has_field("request_users")) {
+      TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_users", td::JsonValue::Type::Object));
+    } else {
+      TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_user", td::JsonValue::Type::Object));
+    }
+    auto &request_user_object = request_user.get_object();
+    TRY_RESULT(id, request_user_object.get_required_int_field("request_id"));
+    auto restrict_user_is_bot = request_user_object.has_field("user_is_bot");
+    TRY_RESULT(user_is_bot, request_user_object.get_optional_bool_field("user_is_bot"));
+    auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
+    TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
+    TRY_RESULT(max_quantity, request_user_object.get_optional_int_field("max_quantity", 1));
+    TRY_RESULT(request_name, request_user_object.get_optional_bool_field("request_name"));
+    TRY_RESULT(request_username, request_user_object.get_optional_bool_field("request_username"));
+    TRY_RESULT(request_photo, request_user_object.get_optional_bool_field("request_photo"));
+    return make_object<td_api::keyboardButtonTypeRequestUsers>(id, restrict_user_is_bot, user_is_bot,
+                                                               restrict_user_is_premium, user_is_premium, max_quantity,
+                                                               request_name, request_username, request_photo);
+  }
+
+  if (object.has_field("request_chat")) {
+    TRY_RESULT(request_chat, object.extract_required_field("request_chat", td::JsonValue::Type::Object));
+    auto &request_chat_object = request_chat.get_object();
+    TRY_RESULT(id, request_chat_object.get_required_int_field("request_id"));
+    TRY_RESULT(chat_is_channel, request_chat_object.get_optional_bool_field("chat_is_channel"));
+    auto restrict_chat_is_forum = request_chat_object.has_field("chat_is_forum");
+    TRY_RESULT(chat_is_forum, request_chat_object.get_optional_bool_field("chat_is_forum"));
+    auto restrict_chat_has_username = request_chat_object.has_field("chat_has_username");
+    TRY_RESULT(chat_has_username, request_chat_object.get_optional_bool_field("chat_has_username"));
+    TRY_RESULT(chat_is_created, request_chat_object.get_optional_bool_field("chat_is_created"));
+    object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
+    if (request_chat_object.has_field("user_administrator_rights")) {
+      TRY_RESULT_ASSIGN(user_administrator_rights,
+                        get_chat_administrator_rights(request_chat_object.extract_field("user_administrator_rights")));
+    }
+    object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
+    if (request_chat_object.has_field("bot_administrator_rights")) {
+      TRY_RESULT_ASSIGN(bot_administrator_rights,
+                        get_chat_administrator_rights(request_chat_object.extract_field("bot_administrator_rights")));
+    }
+    TRY_RESULT(bot_is_member, request_chat_object.get_optional_bool_field("bot_is_member"));
+    TRY_RESULT(request_title, request_chat_object.get_optional_bool_field("request_title"));
+    TRY_RESULT(request_username, request_chat_object.get_optional_bool_field("request_username"));
+    TRY_RESULT(request_photo, request_chat_object.get_optional_bool_field("request_photo"));
+    return make_object<td_api::keyboardButtonTypeRequestChat>(
+        id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username, chat_has_username,
+        chat_is_created, std::move(user_administrator_rights), std::move(bot_administrator_rights), bot_is_member,
+        request_title, request_username, request_photo);
+  }
+
+  return nullptr;
+}
+
 td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_button(td::JsonValue &button) {
   if (button.type() == td::JsonValue::Type::Object) {
     auto &object = button.get_object();
 
     TRY_RESULT(text, object.get_required_string_field("text"));
-
-    TRY_RESULT(request_phone_number, object.get_optional_bool_field("request_phone_number"));
-    TRY_RESULT(request_contact, object.get_optional_bool_field("request_contact"));
-    if (request_phone_number || request_contact) {
-      return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeRequestPhoneNumber>());
-    }
-
-    TRY_RESULT(request_location, object.get_optional_bool_field("request_location"));
-    if (request_location) {
-      return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeRequestLocation>());
-    }
-
-    if (object.has_field("request_poll")) {
-      bool force_regular = false;
-      bool force_quiz = false;
-      TRY_RESULT(request_poll, object.extract_required_field("request_poll", td::JsonValue::Type::Object));
-      auto &request_poll_object = request_poll.get_object();
-      if (request_poll_object.has_field("type")) {
-        TRY_RESULT(type, request_poll_object.get_optional_string_field("type"));
-        if (type == "quiz") {
-          force_quiz = true;
-        } else if (type == "regular") {
-          force_regular = true;
-        }
-      }
-      return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestPoll>(force_regular, force_quiz));
-    }
-
-    if (object.has_field("web_app")) {
-      TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
-      auto &web_app_object = web_app.get_object();
-      TRY_RESULT(url, web_app_object.get_required_string_field("url"));
-      return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
-    }
-
-    if (object.has_field("request_user") || object.has_field("request_users")) {
-      td::JsonValue request_user;
-      if (object.has_field("request_users")) {
-        TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_users", td::JsonValue::Type::Object));
-      } else {
-        TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_user", td::JsonValue::Type::Object));
-      }
-      auto &request_user_object = request_user.get_object();
-      TRY_RESULT(id, request_user_object.get_required_int_field("request_id"));
-      auto restrict_user_is_bot = request_user_object.has_field("user_is_bot");
-      TRY_RESULT(user_is_bot, request_user_object.get_optional_bool_field("user_is_bot"));
-      auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
-      TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
-      TRY_RESULT(max_quantity, request_user_object.get_optional_int_field("max_quantity", 1));
-      TRY_RESULT(request_name, request_user_object.get_optional_bool_field("request_name"));
-      TRY_RESULT(request_username, request_user_object.get_optional_bool_field("request_username"));
-      TRY_RESULT(request_photo, request_user_object.get_optional_bool_field("request_photo"));
-      return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestUsers>(
-                    id, restrict_user_is_bot, user_is_bot, restrict_user_is_premium, user_is_premium, max_quantity,
-                    request_name, request_username, request_photo));
-    }
-
-    if (object.has_field("request_chat")) {
-      TRY_RESULT(request_chat, object.extract_required_field("request_chat", td::JsonValue::Type::Object));
-      auto &request_chat_object = request_chat.get_object();
-      TRY_RESULT(id, request_chat_object.get_required_int_field("request_id"));
-      TRY_RESULT(chat_is_channel, request_chat_object.get_optional_bool_field("chat_is_channel"));
-      auto restrict_chat_is_forum = request_chat_object.has_field("chat_is_forum");
-      TRY_RESULT(chat_is_forum, request_chat_object.get_optional_bool_field("chat_is_forum"));
-      auto restrict_chat_has_username = request_chat_object.has_field("chat_has_username");
-      TRY_RESULT(chat_has_username, request_chat_object.get_optional_bool_field("chat_has_username"));
-      TRY_RESULT(chat_is_created, request_chat_object.get_optional_bool_field("chat_is_created"));
-      object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
-      if (request_chat_object.has_field("user_administrator_rights")) {
-        TRY_RESULT_ASSIGN(
-            user_administrator_rights,
-            get_chat_administrator_rights(request_chat_object.extract_field("user_administrator_rights")));
-      }
-      object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
-      if (request_chat_object.has_field("bot_administrator_rights")) {
-        TRY_RESULT_ASSIGN(bot_administrator_rights,
-                          get_chat_administrator_rights(request_chat_object.extract_field("bot_administrator_rights")));
-      }
-      TRY_RESULT(bot_is_member, request_chat_object.get_optional_bool_field("bot_is_member"));
-      TRY_RESULT(request_title, request_chat_object.get_optional_bool_field("request_title"));
-      TRY_RESULT(request_username, request_chat_object.get_optional_bool_field("request_username"));
-      TRY_RESULT(request_photo, request_chat_object.get_optional_bool_field("request_photo"));
-      return make_object<td_api::keyboardButton>(
-          text,
-          make_object<td_api::keyboardButtonTypeRequestChat>(
-              id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username, chat_has_username,
-              chat_is_created, std::move(user_administrator_rights), std::move(bot_administrator_rights), bot_is_member,
-              request_title, request_username, request_photo));
-    }
-
-    return make_object<td_api::keyboardButton>(text, nullptr);
+    TRY_RESULT(type, get_keyboard_button_type(object));
+    return make_object<td_api::keyboardButton>(text, std::move(type));
   }
   if (button.type() == td::JsonValue::Type::String) {
     return make_object<td_api::keyboardButton>(button.get_string().str(), nullptr);
