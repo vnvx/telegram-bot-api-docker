@@ -219,6 +219,7 @@ bool Client::init_methods() {
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
+  methods_.emplace("getuserprofileaudios", &Client::process_get_user_profile_audios_query);
   methods_.emplace("sendmessage", &Client::process_send_message_query);
   methods_.emplace("sendanimation", &Client::process_send_animation_query);
   methods_.emplace("sendaudio", &Client::process_send_audio_query);
@@ -1036,6 +1037,22 @@ class Client::JsonAudio final : public td::Jsonable {
 
  private:
   const td_api::audio *audio_;
+  const Client *client_;
+};
+
+class Client::JsonAudios final : public td::Jsonable {
+ public:
+  JsonAudios(const td_api::audios *audios, const Client *client) : audios_(audios), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("total_count", audios_->total_count_);
+    object("audios", td::json_array(audios_->audios_,
+                                    [client = client_](auto &audio) { return JsonAudio(audio.get(), client); }));
+  }
+
+ private:
+  const td_api::audios *audios_;
   const Client *client_;
 };
 
@@ -5759,6 +5776,27 @@ class Client::TdOnGetUserProfilePhotosCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::chatPhotos::ID);
     auto profile_photos = move_object_as<td_api::chatPhotos>(result);
     answer_query(JsonChatPhotos(profile_photos.get(), client_), std::move(query_));
+  }
+
+ private:
+  const Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetUserProfileAudiosCallback final : public TdQueryCallback {
+ public:
+  TdOnGetUserProfileAudiosCallback(const Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::audios::ID);
+    auto audios = move_object_as<td_api::audios>(result);
+    answer_query(JsonAudios(audios.get(), client_), std::move(query_));
   }
 
  private:
@@ -12305,6 +12343,18 @@ td::Status Client::process_get_user_profile_photos_query(PromisedQueryPtr &query
   check_user(user_id, std::move(query), [this, user_id, offset, limit](PromisedQueryPtr query) {
     send_request(make_object<td_api::getUserProfilePhotos>(user_id, offset, limit),
                  td::make_unique<TdOnGetUserProfilePhotosCallback>(this, std::move(query)));
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_user_profile_audios_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  int32 offset = get_integer_arg(query.get(), "offset", 0, 0);
+  int32 limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+
+  check_user(user_id, std::move(query), [this, user_id, offset, limit](PromisedQueryPtr query) {
+    send_request(make_object<td_api::getUserProfileAudios>(user_id, offset, limit),
+                 td::make_unique<TdOnGetUserProfileAudiosCallback>(this, std::move(query)));
   });
   return td::Status::OK();
 }
