@@ -1011,6 +1011,34 @@ class Client::JsonUniqueGiftColors final : public td::Jsonable {
   const td_api::upgradedGiftColors *gift_colors_;
 };
 
+class Client::JsonAudio final : public td::Jsonable {
+ public:
+  JsonAudio(const td_api::audio *audio, const Client *client) : audio_(audio), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("duration", audio_->duration_);
+    if (!audio_->file_name_.empty()) {
+      object("file_name", audio_->file_name_);
+    }
+    if (!audio_->mime_type_.empty()) {
+      object("mime_type", audio_->mime_type_);
+    }
+    if (!audio_->title_.empty()) {
+      object("title", audio_->title_);
+    }
+    if (!audio_->performer_.empty()) {
+      object("performer", audio_->performer_);
+    }
+    client_->json_store_thumbnail(object, audio_->album_cover_thumbnail_.get());
+    client_->json_store_file(object, audio_->audio_.get());
+  }
+
+ private:
+  const td_api::audio *audio_;
+  const Client *client_;
+};
+
 class Client::JsonMessage final : public td::Jsonable {
  public:
   JsonMessage(const MessageInfo *message, bool need_reply, const td::string &source, const Client *client)
@@ -1113,6 +1141,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->rating != nullptr) {
             object("rating", JsonUserRating(user_info->rating.get()));
+          }
+          if (user_info->first_profile_audio != nullptr) {
+            object("first_profile_audio", JsonAudio(user_info->first_profile_audio.get(), client_));
           }
           if (user_info->paid_message_star_count > 0) {
             object("paid_message_star_count", user_info->paid_message_star_count);
@@ -1747,34 +1778,6 @@ class Client::JsonAnimation final : public td::Jsonable {
  private:
   const td_api::animation *animation_;
   bool as_document_;
-  const Client *client_;
-};
-
-class Client::JsonAudio final : public td::Jsonable {
- public:
-  JsonAudio(const td_api::audio *audio, const Client *client) : audio_(audio), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("duration", audio_->duration_);
-    if (!audio_->file_name_.empty()) {
-      object("file_name", audio_->file_name_);
-    }
-    if (!audio_->mime_type_.empty()) {
-      object("mime_type", audio_->mime_type_);
-    }
-    if (!audio_->title_.empty()) {
-      object("title", audio_->title_);
-    }
-    if (!audio_->performer_.empty()) {
-      object("performer", audio_->performer_);
-    }
-    client_->json_store_thumbnail(object, audio_->album_cover_thumbnail_.get());
-    client_->json_store_file(object, audio_->audio_.get());
-  }
-
- private:
-  const td_api::audio *audio_;
   const Client *client_;
 };
 
@@ -8671,6 +8674,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->business_info = std::move(full_info->business_info_);
       user_info->accepted_gift_types = std::move(full_info->gift_settings_->accepted_gift_types_);
       user_info->rating = std::move(full_info->rating_);
+      user_info->first_profile_audio = std::move(full_info->first_profile_audio_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;

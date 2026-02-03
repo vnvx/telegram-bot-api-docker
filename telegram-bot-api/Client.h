@@ -993,6 +993,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::businessInfo> business_info;
     object_ptr<td_api::acceptedGiftTypes> accepted_gift_types;
     object_ptr<td_api::userRating> rating;
+    object_ptr<td_api::audio> first_profile_audio;
     int64 personal_chat_id = 0;
     int64 paid_message_star_count = 0;
 
