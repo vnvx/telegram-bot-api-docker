@@ -9172,37 +9172,40 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   }
 
   auto &object = button.get_object();
-
   TRY_RESULT(text, object.get_required_string_field("text"));
+  TRY_RESULT(type, get_inline_keyboard_button_type(object, bot_user_ids));
+  return make_object<td_api::inlineKeyboardButton>(text, std::move(type));
+}
+
+td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inline_keyboard_button_type(
+    td::JsonObject &object, BotUserIds &bot_user_ids) {
   {
     TRY_RESULT(url, object.get_optional_string_field("url"));
     if (!url.empty()) {
-      return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeUrl>(url));
+      return make_object<td_api::inlineKeyboardButtonTypeUrl>(url);
     }
   }
 
   {
     TRY_RESULT(callback_data, object.get_optional_string_field("callback_data"));
     if (!callback_data.empty()) {
-      return make_object<td_api::inlineKeyboardButton>(
-          text, make_object<td_api::inlineKeyboardButtonTypeCallback>(callback_data));
+      return make_object<td_api::inlineKeyboardButtonTypeCallback>(callback_data);
     }
   }
 
   if (object.has_field("callback_game")) {
-    return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeCallbackGame>());
+    return make_object<td_api::inlineKeyboardButtonTypeCallbackGame>();
   }
 
   if (object.has_field("pay")) {
-    return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeBuy>());
+    return make_object<td_api::inlineKeyboardButtonTypeBuy>();
   }
 
   if (object.has_field("switch_inline_query")) {
     TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query"));
-    return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
-                  switch_inline_query,
-                  make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(true, true, true, true))));
+    return make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
+        switch_inline_query,
+        make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(true, true, true, true)));
   }
 
   if (object.has_field("switch_inline_query_chosen_chat")) {
@@ -9215,17 +9218,15 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     TRY_RESULT(allow_bot_chats, switch_inline_query_object.get_optional_bool_field("allow_bot_chats"));
     TRY_RESULT(allow_group_chats, switch_inline_query_object.get_optional_bool_field("allow_group_chats"));
     TRY_RESULT(allow_channel_chats, switch_inline_query_object.get_optional_bool_field("allow_channel_chats"));
-    return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
-                  query, make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(
-                             allow_user_chats, allow_bot_chats, allow_group_chats, allow_channel_chats))));
+    return make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
+        query, make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(
+                   allow_user_chats, allow_bot_chats, allow_group_chats, allow_channel_chats)));
   }
 
   if (object.has_field("switch_inline_query_current_chat")) {
     TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query_current_chat"));
-    return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(switch_inline_query,
-                                                                        make_object<td_api::targetChatCurrent>()));
+    return make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(switch_inline_query,
+                                                                     make_object<td_api::targetChatCurrent>());
   }
 
   if (object.has_field("login_url")) {
@@ -9265,23 +9266,21 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     if (!request_write_access) {
       bot_user_id *= -1;
     }
-    return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeLoginUrl>(url, bot_user_id, forward_text));
+    return make_object<td_api::inlineKeyboardButtonTypeLoginUrl>(url, bot_user_id, forward_text);
   }
 
   if (object.has_field("web_app")) {
     TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
     auto &web_app_object = web_app.get_object();
     TRY_RESULT(url, web_app_object.get_required_string_field("url"));
-    return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
+    return make_object<td_api::inlineKeyboardButtonTypeWebApp>(url);
   }
 
   if (object.has_field("copy_text")) {
     TRY_RESULT(copy_text, object.extract_required_field("copy_text", td::JsonValue::Type::Object));
     auto &copy_text_object = copy_text.get_object();
     TRY_RESULT(copied_text, copy_text_object.get_required_string_field("text"));
-    return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeCopyText>(copied_text));
+    return make_object<td_api::inlineKeyboardButtonTypeCopyText>(copied_text);
   }
 
   return td::Status::Error(400, "Text buttons are unallowed in the inline keyboard");
