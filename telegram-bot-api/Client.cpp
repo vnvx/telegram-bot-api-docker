@@ -9080,6 +9080,24 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   return std::move(result);
 }
 
+td::Result<td_api::object_ptr<td_api::ButtonStyle>> Client::get_button_style(td::Result<td::string> r_style) {
+  TRY_RESULT(style, std::move(r_style));
+  td::to_lower_inplace(style);
+  if (style.empty() || style == "default") {
+    return make_object<td_api::buttonStyleDefault>();
+  }
+  if (style == "primary") {
+    return make_object<td_api::buttonStylePrimary>();
+  }
+  if (style == "danger") {
+    return make_object<td_api::buttonStyleDanger>();
+  }
+  if (style == "success") {
+    return make_object<td_api::buttonStyleSuccess>();
+  }
+  return td::Status::Error("invalid button style specified");
+}
+
 td::Result<td_api::object_ptr<td_api::KeyboardButtonType>> Client::get_keyboard_button_type(td::JsonObject &object) {
   TRY_RESULT(request_phone_number, object.get_optional_bool_field("request_phone_number"));
   TRY_RESULT(request_contact, object.get_optional_bool_field("request_contact"));
@@ -9175,8 +9193,10 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     auto &object = button.get_object();
 
     TRY_RESULT(text, object.get_required_string_field("text"));
+    TRY_RESULT(icon, object.get_optional_long_field("icon_custom_emoji_id"));
+    TRY_RESULT(style, get_button_style(object.get_optional_string_field("style")));
     TRY_RESULT(type, get_keyboard_button_type(object));
-    return make_object<td_api::keyboardButton>(text, 0, nullptr, std::move(type));
+    return make_object<td_api::keyboardButton>(text, std::move(icon), std::move(style), std::move(type));
   }
   if (button.type() == td::JsonValue::Type::String) {
     return make_object<td_api::keyboardButton>(button.get_string().str(), 0, nullptr, nullptr);
@@ -9193,8 +9213,10 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
 
   auto &object = button.get_object();
   TRY_RESULT(text, object.get_required_string_field("text"));
+  TRY_RESULT(icon, object.get_optional_long_field("icon_custom_emoji_id"));
+  TRY_RESULT(style, get_button_style(object.get_optional_string_field("style")));
   TRY_RESULT(type, get_inline_keyboard_button_type(object, bot_user_ids));
-  return make_object<td_api::inlineKeyboardButton>(text, 0, nullptr, std::move(type));
+  return make_object<td_api::inlineKeyboardButton>(text, std::move(icon), std::move(style), std::move(type));
 }
 
 td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inline_keyboard_button_type(

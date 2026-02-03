@@ -484,6 +484,8 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<InputReplyParameters> get_reply_parameters(td::JsonValue &&value);
 
+  static td::Result<object_ptr<td_api::ButtonStyle>> get_button_style(td::Result<td::string> r_style);
+
   static td::Result<object_ptr<td_api::KeyboardButtonType>> get_keyboard_button_type(td::JsonObject &object);
 
   static td::Result<object_ptr<td_api::keyboardButton>> get_keyboard_button(td::JsonValue &button);
