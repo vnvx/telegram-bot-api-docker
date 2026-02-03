@@ -1867,10 +1867,33 @@ class Client::JsonChatPhoto final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonVideoQuality final : public td::Jsonable {
+ public:
+  JsonVideoQuality(const td_api::alternativeVideo *alternative_video, const Client *client)
+      : alternative_video_(alternative_video), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("width", alternative_video_->width_);
+    object("height", alternative_video_->height_);
+    object("codec", alternative_video_->codec_);
+    client_->json_store_file(object, alternative_video_->video_.get());
+  }
+
+ private:
+  const td_api::alternativeVideo *alternative_video_;
+  const Client *client_;
+};
+
 class Client::JsonVideo final : public td::Jsonable {
  public:
-  JsonVideo(const td_api::video *video, const td_api::photo *cover, int32 start_timestamp, const Client *client)
-      : video_(video), cover_(cover), start_timestamp_(start_timestamp), client_(client) {
+  JsonVideo(const td_api::video *video, const td_api::photo *cover, int32 start_timestamp,
+            const td::vector<object_ptr<td_api::alternativeVideo>> *alternative_videos, const Client *client)
+      : video_(video)
+      , cover_(cover)
+      , start_timestamp_(start_timestamp)
+      , alternative_videos_(alternative_videos)
+      , client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -1889,6 +1912,13 @@ class Client::JsonVideo final : public td::Jsonable {
     if (start_timestamp_ > 0) {
       object("start_timestamp", start_timestamp_);
     }
+    if (alternative_videos_ != nullptr && !alternative_videos_->empty()) {
+      object("qualities",
+             td::json_array(*alternative_videos_,
+                            [client = client_](const object_ptr<td_api::alternativeVideo> &alternative_video) {
+                              return JsonVideoQuality(alternative_video.get(), client);
+                            }));
+    }
     client_->json_store_thumbnail(object, video_->thumbnail_.get());
     client_->json_store_file(object, video_->video_.get());
   }
@@ -1897,6 +1927,7 @@ class Client::JsonVideo final : public td::Jsonable {
   const td_api::video *video_;
   const td_api::photo *cover_;
   int32 start_timestamp_;
+  const td::vector<object_ptr<td_api::alternativeVideo>> *alternative_videos_;
   const Client *client_;
 };
 
@@ -1965,7 +1996,7 @@ class Client::JsonPaidMedia final : public td::Jsonable {
       case td_api::paidMediaVideo::ID: {
         auto media = static_cast<const td_api::paidMediaVideo *>(paid_media_);
         object("type", "video");
-        object("video", JsonVideo(media->video_.get(), media->cover_.get(), media->start_timestamp_, client_));
+        object("video", JsonVideo(media->video_.get(), media->cover_.get(), media->start_timestamp_, nullptr, client_));
         break;
       }
       case td_api::paidMediaUnsupported::ID:
@@ -3598,7 +3629,8 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         }
         case td_api::messageVideo::ID: {
           auto content = static_cast<const td_api::messageVideo *>(reply_->content_.get());
-          object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_, client_));
+          object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_,
+                                    &content->alternative_videos_, client_));
           add_media_spoiler(object, content->has_spoiler_);
           break;
         }
@@ -3865,7 +3897,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageVideo::ID: {
       auto content = static_cast<const td_api::messageVideo *>(message_->content.get());
-      object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_, client_));
+      object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_,
+                                &content->alternative_videos_, client_));
       add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
       break;

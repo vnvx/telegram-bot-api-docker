@@ -120,6 +120,7 @@ class Client final : public WebhookActor::Callback {
   class JsonMaskPosition;
   class JsonSticker;
   class JsonStickers;
+  class JsonVideoQuality;
   class JsonVideo;
   class JsonVideoNote;
   class JsonVoiceNote;
