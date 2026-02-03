@@ -3462,6 +3462,24 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("text", button_->text_);
+    if (button_->icon_custom_emoji_id_ != 0) {
+      object("icon_custom_emoji_id", td::to_string(button_->icon_custom_emoji_id_));
+    }
+    switch (button_->style_->get_id()) {
+      case td_api::buttonStyleDefault::ID:
+        break;
+      case td_api::buttonStylePrimary::ID:
+        object("style", "primary");
+        break;
+      case td_api::buttonStyleDanger::ID:
+        object("style", "danger");
+        break;
+      case td_api::buttonStyleSuccess::ID:
+        object("style", "success");
+        break;
+      default:
+        UNREACHABLE();
+    }
     switch (button_->type_->get_id()) {
       case td_api::inlineKeyboardButtonTypeUrl::ID: {
         auto type = static_cast<const td_api::inlineKeyboardButtonTypeUrl *>(button_->type_.get());
@@ -16800,6 +16818,12 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
   CHECK(lhs != nullptr);
   CHECK(rhs != nullptr);
   if (lhs->text_ != rhs->text_) {
+    return false;
+  }
+  if (lhs->icon_custom_emoji_id_ != rhs->icon_custom_emoji_id_) {
+    return false;
+  }
+  if (lhs->style_->get_id() != rhs->style_->get_id()) {
     return false;
   }
   if (lhs->type_->get_id() != rhs->type_->get_id()) {
