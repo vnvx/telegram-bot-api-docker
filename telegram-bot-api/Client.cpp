@@ -213,6 +213,7 @@ bool Client::init_methods() {
   methods_.emplace("getmyname", &Client::process_get_my_name_query);
   methods_.emplace("setmyname", &Client::process_set_my_name_query);
   methods_.emplace("setmyprofilephoto", &Client::process_set_my_profile_photo_query);
+  methods_.emplace("removemyprofilephoto", &Client::process_remove_my_profile_photo_query);
   methods_.emplace("getmydescription", &Client::process_get_my_description_query);
   methods_.emplace("setmydescription", &Client::process_set_my_description_query);
   methods_.emplace("getmyshortdescription", &Client::process_get_my_short_description_query);
@@ -12281,6 +12282,11 @@ td::Status Client::process_set_my_profile_photo_query(PromisedQueryPtr &query) {
   TRY_RESULT(photo, get_input_chat_photo(query.get()));
   send_request(make_object<td_api::setProfilePhoto>(std::move(photo), false),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_remove_my_profile_photo_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::deleteProfilePhoto>(0), td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
 

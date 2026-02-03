@@ -751,6 +751,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_get_my_name_query(PromisedQueryPtr &query);
   td::Status process_set_my_name_query(PromisedQueryPtr &query);
   td::Status process_set_my_profile_photo_query(PromisedQueryPtr &query);
+  td::Status process_remove_my_profile_photo_query(PromisedQueryPtr &query);
   td::Status process_get_my_description_query(PromisedQueryPtr &query);
   td::Status process_set_my_description_query(PromisedQueryPtr &query);
   td::Status process_get_my_short_description_query(PromisedQueryPtr &query);
