@@ -1446,7 +1446,10 @@ class Client::JsonUniqueGiftModel final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", model_->name_);
     object("sticker", JsonSticker(model_->sticker_.get(), client_));
-    object("rarity_per_mille", model_->rarity_per_mille_);
+    object("rarity_per_mille",
+           model_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
+               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(model_->rarity_.get())->per_mille_
+               : 0);
   }
 
  private:
@@ -1463,7 +1466,10 @@ class Client::JsonUniqueGiftSymbol final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", symbol_->name_);
     object("sticker", JsonSticker(symbol_->sticker_.get(), client_));
-    object("rarity_per_mille", symbol_->rarity_per_mille_);
+    object("rarity_per_mille",
+           symbol_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
+               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(symbol_->rarity_.get())->per_mille_
+               : 0);
   }
 
  private:
@@ -1495,7 +1501,10 @@ class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", backdrop_->name_);
     object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
-    object("rarity_per_mille", backdrop_->rarity_per_mille_);
+    object("rarity_per_mille",
+           backdrop_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
+               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(backdrop_->rarity_.get())->per_mille_
+               : 0);
   }
 
  private:
@@ -2910,6 +2919,10 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
       case td_api::upgradedGiftOriginOffer::ID:
         object("origin", "offer");
         break;
+      case td_api::upgradedGiftOriginCraft::ID:
+        LOG(ERROR) << "Receive a crafted gift";
+        object("origin", "craft");
+        break;
       default:
         UNREACHABLE();
     }
@@ -4318,6 +4331,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
       break;
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
+      break;
+    case td_api::messageChatOwnerLeft::ID:
+      break;
+    case td_api::messageChatOwnerChanged::ID:
       break;
     default:
       UNREACHABLE();
@@ -9159,10 +9176,10 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
 
     TRY_RESULT(text, object.get_required_string_field("text"));
     TRY_RESULT(type, get_keyboard_button_type(object));
-    return make_object<td_api::keyboardButton>(text, std::move(type));
+    return make_object<td_api::keyboardButton>(text, 0, nullptr, std::move(type));
   }
   if (button.type() == td::JsonValue::Type::String) {
-    return make_object<td_api::keyboardButton>(button.get_string().str(), nullptr);
+    return make_object<td_api::keyboardButton>(button.get_string().str(), 0, nullptr, nullptr);
   }
 
   return td::Status::Error(400, "KeyboardButton must be a String or an Object");
@@ -9177,7 +9194,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   auto &object = button.get_object();
   TRY_RESULT(text, object.get_required_string_field("text"));
   TRY_RESULT(type, get_inline_keyboard_button_type(object, bot_user_ids));
-  return make_object<td_api::inlineKeyboardButton>(text, std::move(type));
+  return make_object<td_api::inlineKeyboardButton>(text, 0, nullptr, std::move(type));
 }
 
 td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inline_keyboard_button_type(
@@ -16551,6 +16568,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestBirthdate::ID:
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
+    case td_api::messageChatOwnerLeft::ID:
+    case td_api::messageChatOwnerChanged::ID:
       return true;
     default:
       break;
