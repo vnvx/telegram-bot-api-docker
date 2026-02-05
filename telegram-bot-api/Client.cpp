@@ -1546,6 +1546,9 @@ class Client::JsonUniqueGift final : public td::Jsonable {
     if (gift_->host_id_ != nullptr) {
       object("is_from_blockchain", td::JsonTrue());
     }
+    if (gift_->is_burned_) {
+      object("is_burned", td::JsonTrue());
+    }
   }
 
  private:
