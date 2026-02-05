@@ -3718,6 +3718,8 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
           break;
         }
         case td_api::messageStakeDice::ID: {
+          auto content = static_cast<const td_api::messageStakeDice *>(reply_->content_.get());
+          object("dice", JsonDice("🎲", content->value_));
           break;
         }
         case td_api::messageVenue::ID: {
@@ -3988,6 +3990,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     }
     case td_api::messageStakeDice::ID: {
+      auto content = static_cast<const td_api::messageStakeDice *>(message_->content.get());
+      object("dice", JsonDice("🎲", content->value_));
       break;
     }
     case td_api::messageVenue::ID: {
