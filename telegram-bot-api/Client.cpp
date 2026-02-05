@@ -2656,6 +2656,23 @@ class Client::JsonChatBackground final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatOwnerLeft final : public td::Jsonable {
+ public:
+  JsonChatOwnerLeft(const td_api::messageChatOwnerLeft *chat_owner_left, const Client *client)
+      : chat_owner_left_(chat_owner_left), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (chat_owner_left_->new_owner_user_id_ > 0) {
+      object("new_owner", JsonUser(chat_owner_left_->new_owner_user_id_, client_));
+    }
+  }
+
+ private:
+  const td_api::messageChatOwnerLeft *chat_owner_left_;
+  const Client *client_;
+};
+
 class Client::JsonForumTopicCreated final : public td::Jsonable {
  public:
   explicit JsonForumTopicCreated(const td_api::messageForumTopicCreated *forum_topic_created)
@@ -4367,8 +4384,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
       break;
-    case td_api::messageChatOwnerLeft::ID:
+    case td_api::messageChatOwnerLeft::ID: {
+      auto content = static_cast<const td_api::messageChatOwnerLeft *>(message_->content.get());
+      object("chat_owner_left", JsonChatOwnerLeft(content, client_));
       break;
+    }
     case td_api::messageChatOwnerChanged::ID:
       break;
     default:
@@ -16694,7 +16714,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestBirthdate::ID:
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
-    case td_api::messageChatOwnerLeft::ID:
     case td_api::messageChatOwnerChanged::ID:
       return true;
     default:
