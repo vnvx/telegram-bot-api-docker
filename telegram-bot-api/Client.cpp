@@ -2656,6 +2656,21 @@ class Client::JsonChatBackground final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatOwnerChanged final : public td::Jsonable {
+ public:
+  JsonChatOwnerChanged(const td_api::messageChatOwnerChanged *chat_owner_changed, const Client *client)
+      : chat_owner_changed_(chat_owner_changed), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("new_owner", JsonUser(chat_owner_changed_->new_owner_user_id_, client_));
+  }
+
+ private:
+  const td_api::messageChatOwnerChanged *chat_owner_changed_;
+  const Client *client_;
+};
+
 class Client::JsonChatOwnerLeft final : public td::Jsonable {
  public:
   JsonChatOwnerLeft(const td_api::messageChatOwnerLeft *chat_owner_left, const Client *client)
@@ -4389,8 +4404,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("chat_owner_left", JsonChatOwnerLeft(content, client_));
       break;
     }
-    case td_api::messageChatOwnerChanged::ID:
+    case td_api::messageChatOwnerChanged::ID: {
+      auto content = static_cast<const td_api::messageChatOwnerChanged *>(message_->content.get());
+      object("chat_owner_changed", JsonChatOwnerChanged(content, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -16714,7 +16732,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestBirthdate::ID:
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
-    case td_api::messageChatOwnerChanged::ID:
       return true;
     default:
       break;
