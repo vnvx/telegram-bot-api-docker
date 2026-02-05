@@ -904,7 +904,7 @@ class Client::JsonChatPermissions final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    Client::json_store_permissions(object, chat_permissions_);
+    json_store_permissions(object, chat_permissions_);
   }
 
  private:
@@ -1465,10 +1465,7 @@ class Client::JsonUniqueGiftModel final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", model_->name_);
     object("sticker", JsonSticker(model_->sticker_.get(), client_));
-    object("rarity_per_mille",
-           model_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
-               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(model_->rarity_.get())->per_mille_
-               : 0);
+    json_store_rarity(object, model_->rarity_.get());
   }
 
  private:
@@ -1485,10 +1482,7 @@ class Client::JsonUniqueGiftSymbol final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", symbol_->name_);
     object("sticker", JsonSticker(symbol_->sticker_.get(), client_));
-    object("rarity_per_mille",
-           symbol_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
-               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(symbol_->rarity_.get())->per_mille_
-               : 0);
+    json_store_rarity(object, symbol_->rarity_.get());
   }
 
  private:
@@ -1520,10 +1514,7 @@ class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
     auto object = scope->enter_object();
     object("name", backdrop_->name_);
     object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
-    object("rarity_per_mille",
-           backdrop_->rarity_->get_id() == td_api::upgradedGiftAttributeRarityPerMille::ID
-               ? static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(backdrop_->rarity_.get())->per_mille_
-               : 0);
+    json_store_rarity(object, backdrop_->rarity_.get());
   }
 
  private:
@@ -4766,7 +4757,7 @@ class Client::JsonChatAdministratorRights final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     td_api::chatAdministratorRights empty_rights;
-    Client::json_store_administrator_rights(object, rights_ == nullptr ? &empty_rights : rights_, chat_type_);
+    json_store_administrator_rights(object, rights_ == nullptr ? &empty_rights : rights_, chat_type_);
   }
 
  private:
@@ -4824,7 +4815,7 @@ class Client::JsonChatMember final : public td::Jsonable {
       case td_api::chatMemberStatusAdministrator::ID: {
         auto administrator = static_cast<const td_api::chatMemberStatusAdministrator *>(member_->status_.get());
         object("can_be_edited", td::JsonBool(administrator->can_be_edited_));
-        Client::json_store_administrator_rights(object, administrator->rights_.get(), chat_type_);
+        json_store_administrator_rights(object, administrator->rights_.get(), chat_type_);
         object("can_manage_voice_chats", td::JsonBool(administrator->rights_->can_manage_video_chats_));
         if (!administrator->custom_title_.empty()) {
           object("custom_title", administrator->custom_title_);
@@ -4842,7 +4833,7 @@ class Client::JsonChatMember final : public td::Jsonable {
         if (chat_type_ == Client::ChatType::Supergroup) {
           auto restricted = static_cast<const td_api::chatMemberStatusRestricted *>(member_->status_.get());
           object("until_date", restricted->restricted_until_date_);
-          Client::json_store_permissions(object, restricted->permissions_.get());
+          json_store_permissions(object, restricted->permissions_.get());
           object("is_member", td::JsonBool(restricted->is_member_));
         }
         break;
@@ -16024,6 +16015,30 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_invite_users", td::JsonBool(permissions->can_invite_users_));
   object("can_pin_messages", td::JsonBool(permissions->can_pin_messages_));
   object("can_manage_topics", td::JsonBool(permissions->can_create_topics_));
+}
+
+void Client::json_store_rarity(td::JsonObjectScope &object, const td_api::UpgradedGiftAttributeRarity *rarity) {
+  int32 rarity_per_mille = 0;
+  switch (rarity->get_id()) {
+    case td_api::upgradedGiftAttributeRarityPerMille::ID:
+      rarity_per_mille = static_cast<const td_api::upgradedGiftAttributeRarityPerMille *>(rarity)->per_mille_;
+      break;
+    case td_api::upgradedGiftAttributeRarityUncommon::ID:
+      object("rarity", "uncommon");
+      break;
+    case td_api::upgradedGiftAttributeRarityRare::ID:
+      object("rarity", "rare");
+      break;
+    case td_api::upgradedGiftAttributeRarityEpic::ID:
+      object("rarity", "epic");
+      break;
+    case td_api::upgradedGiftAttributeRarityLegendary::ID:
+      object("rarity", "legendary");
+      break;
+    default:
+      UNREACHABLE();
+  }
+  object("rarity_per_mille", rarity_per_mille);
 }
 
 td::Slice Client::get_update_type_name(UpdateType update_type) {
