@@ -1,0 +1,20 @@
+# Keep this image's own build inputs current automatically, mirroring the parent
+# archo project's policy ("always the latest versions" via PRs, not floating tags).
+version: 2
+updates:
+  # The actions used by build.yml (checkout / setup-buildx / docker-* / attest /
+  # upload-artifact). One grouped PR keeps the noise down.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Dockerfile base image (debian:bookworm-slim). tdlib itself is cloned from
+  # upstream HEAD at build time, so there is nothing to pin for it here.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"

@@ -1,0 +1,204 @@
+# Build the telegram-bot-api server image and publish it to GitHub Container
+# Registry (GHCR). This mirrors the parent archo project's build.yml, adapted for
+# a heavy C++ source build: a self-contained base image with no project gate to
+# reuse (the source is tdlib's, not ours) and no deploy step (this is infra that
+# the archo stack pulls — `docker compose pull telegram-bot-api` — not a service
+# this repo rolls out).
+#
+# NATIVE MULTI-ARCH. The archo fleet is linux/arm64 but the dev host / VM lab are
+# linux/amd64, and the root project now *pulls* this image instead of building it
+# locally. So we publish BOTH arches and let the daemon pick the right variant.
+# tdlib's C++ compile is far too slow under QEMU, so each arch is built on its own
+# native runner (no emulation) and the two digests are stitched into one manifest
+# list by the `merge` job — GitHub's recommended native multi-arch pattern.
+#
+# NOTE ON FRESHNESS: the Dockerfile clones telegram-bot-api from upstream HEAD at
+# build time (it does not compile this repo's vendored source). So `:latest`
+# tracks upstream at the moment of the build, and we deliberately do NOT use a
+# layer cache here — an unchanged Dockerfile would cache-hit and re-publish a
+# stale binary even after upstream advanced. Publishes are infrequent (only when
+# master moves), so a clean compile each time is the correct trade.
+name: Build & publish
+
+on:
+  # Every advance of master republishes (merging a new upstream tdlib changes the
+  # vendored source but not the Dockerfile, so we cannot path-filter this without
+  # missing version bumps — see "freshness" above).
+  push:
+    branches: [master]
+    tags: ["v*.*.*"]
+  # On a PR only validate that the image still builds (no push). Only the Dockerfile
+  # and this workflow affect the build (the Dockerfile clones upstream rather than
+  # COPYing the vendored source), so other paths skip the slow compile.
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # vnvx/telegram-bot-api-docker
+
+concurrency:
+  group: build-${{ github.ref }}
+  # Cancel superseded PR builds; never interrupt an in-flight master publish.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  # One job per architecture, each on its own native runner (no QEMU). On push it
+  # pushes the per-arch image BY DIGEST (no tags); the merge job assembles the tags.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      attestations: write # build-provenance attestation (merge job)
+      id-token: write # OIDC for the attestation signature
+    steps:
+      - uses: actions/checkout@v6
+        # No `submodules: recursive` needed: the Dockerfile clones tdlib (and its
+        # `td` submodule) from upstream itself rather than building the vendored
+        # source tree.
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # GHCR repositories must be lowercase; lowercase keeps it correct for any fork.
+      - name: Compute image reference
+        id: ref
+        run: echo "image=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      # The workflow's GITHUB_TOKEN can push packages for this repo — no PAT needed.
+      # Skipped on PRs (validation only, nothing is pushed).
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The Dockerfile defaults to a single build core; hand it every core the runner
+      # has so the tdlib compile is not artificially serialised.
+      - name: Detect build cores
+        id: cores
+        run: echo "n=$(nproc)" >> "$GITHUB_OUTPUT"
+
+      - name: Build (push by digest on non-PR)
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            BUILD_CORES=${{ steps.cores.outputs.n }}
+          # On push/tag/dispatch: publish this arch by digest (the merge job tags it).
+          # On PR: build into cache only — validates the compile without pushing.
+          outputs: ${{ github.event_name != 'pull_request' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', steps.ref.outputs.image) || 'type=cacheonly' }}
+          # The merge job owns provenance for the final manifest; keep buildkit's
+          # inline attestor off so we don't ship competing provenance records.
+          provenance: false
+
+      # Hand the per-arch digest to the merge job via an artifact (one file named
+      # after the digest, per the GitHub multi-arch recipe).
+      - name: Export digest
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assemble the per-arch digests into one multi-arch manifest list, apply the tag
+  # set, push it, and attest the final manifest. Skipped on PRs (nothing was pushed).
+  merge:
+    needs: [build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute image reference
+        id: ref
+        run: echo "image=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags & OCI labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.ref.outputs.image }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Stitch the digests into one manifest list under every derived tag, then push.
+      - name: Create & push manifest list
+        id: manifest
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ steps.ref.outputs.image }}@sha256:%s ' *)
+          digest="$(docker buildx imagetools inspect \
+            '${{ steps.ref.outputs.image }}:${{ steps.meta.outputs.version }}' \
+            --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect published manifest
+        run: docker buildx imagetools inspect '${{ steps.ref.outputs.image }}:${{ steps.meta.outputs.version }}'
+
+      # Signed SLSA build provenance for the manifest digest, verifiable with
+      # `gh attestation verify oci://<image>@<digest> --owner <owner>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ steps.ref.outputs.image }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
