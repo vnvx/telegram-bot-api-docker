@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -77,7 +77,7 @@ void ClientManager::send(PromisedQueryPtr query) {
   }
   auto r_user_id = td::to_integer_safe<td::int64>(query->token().substr(0, token.find(':')));
   if (r_user_id.is_error() || !token_range_(r_user_id.ok())) {
-    return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
+    return fail_query(421, "Misdirected Request: forbidden token specified", std::move(query));
   }
   auto user_id = r_user_id.ok();
   if (user_id <= 0 || user_id >= (static_cast<td::int64>(1) << 54)) {
